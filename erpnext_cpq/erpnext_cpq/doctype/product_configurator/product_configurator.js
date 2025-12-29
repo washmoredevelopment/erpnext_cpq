@@ -14,6 +14,17 @@ frappe.ui.form.on('Product Configurator', {
 		// Update the Select options when an option is removed
 		update_option_choices_select(frm)
 	},
+	option_choices_add(frm, cdt, cdn) {
+		// Auto-fill option_name from last row for convenience
+		const rows = frm.doc.option_choices || []
+		if (rows.length > 1) {
+			const prev_row = rows[rows.length - 2]
+			const new_row = frappe.get_doc(cdt, cdn)
+			if (prev_row.option_name && !new_row.option_name) {
+				frappe.model.set_value(cdt, cdn, 'option_name', prev_row.option_name)
+			}
+		}
+	},
 })
 
 frappe.ui.form.on('Configurator Option', {
@@ -26,17 +37,6 @@ frappe.ui.form.on('Configurator Option', {
 frappe.ui.form.on('Option Choice', {
 	option_name(frm, cdt, cdn) {
 		sort_option_choices(frm)
-	},
-	option_choices_add(frm, cdt, cdn) {
-		// Auto-fill option_name from last row for convenience
-		const rows = frm.doc.option_choices || []
-		if (rows.length > 1) {
-			const prev_row = rows[rows.length - 2]
-			const new_row = frappe.get_doc(cdt, cdn)
-			if (prev_row.option_name && !new_row.option_name) {
-				frappe.model.set_value(cdt, cdn, 'option_name', prev_row.option_name)
-			}
-		}
 	},
 })
 

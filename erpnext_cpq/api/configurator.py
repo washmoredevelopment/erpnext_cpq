@@ -377,11 +377,13 @@ def build_configuration_summary(selections: list, configurator) -> str:
 		label = selection.option_label or selection.option_name
 		value = selection.display_value or selection.value
 
-		# For Check fields, show Yes/No (handle all boolean representations)
-		if value == "1" or value == 1 or value is True or value == "True":
-			value = "Yes"
-		elif value == "0" or value == 0 or value is False or value == "False":
-			value = "No"
+		# For Check fields only, show Yes/No instead of 1/0
+		field_type = _get_option_field_type(configurator, selection.option_name)
+		if field_type == "Check":
+			if value == "1" or value == 1 or value is True or value == "True":
+				value = "Yes"
+			elif value == "0" or value == 0 or value is False or value == "False":
+				value = "No"
 
 		lines.append(f"• {label}: {value}")
 
@@ -428,6 +430,23 @@ def _get_option_label(configurator, option_name: str) -> str:
 		if option.option_name == option_name:
 			return option.label
 	return option_name
+
+
+def _get_option_field_type(configurator, option_name: str) -> str | None:
+	"""
+	Look up the field type for an option.
+
+	Args:
+	    configurator: Product Configurator doc
+	    option_name: The option's internal name
+
+	Returns:
+	    str or None: Field type if found, otherwise None
+	"""
+	for option in configurator.options:
+		if option.option_name == option_name:
+			return option.field_type
+	return None
 
 
 # =============================================================================
