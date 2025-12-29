@@ -60,14 +60,14 @@
 		},
 		{
 			"depends_on": "eval:doc.condition_type !== 'Always'",
-			"description": "The option to check (must match an Option Name from above)",
+			"description": "Select the option to check",
 			"fieldname": "option_name",
-			"fieldtype": "Data",
+			"fieldtype": "Select",
 			"label": "Option Name"
 		},
 		{
 			"depends_on": "eval:['When Equals', 'When Greater Than', 'When Less Than', 'When In List'].includes(doc.condition_type)",
-			"description": "Value to compare against. For 'When In List', use comma-separated values",
+			"description": "Value to compare against. For 'When Equals', select from choices. For numeric/list, enter manually.",
 			"fieldname": "option_value",
 			"fieldtype": "Data",
 			"label": "Option Value"
@@ -86,7 +86,7 @@
 		{
 			"description": "Optional: Pull quantity from a numeric option instead of using Base Qty",
 			"fieldname": "qty_from_option",
-			"fieldtype": "Data",
+			"fieldtype": "Select",
 			"label": "Qty From Option"
 		},
 		{
@@ -110,7 +110,7 @@
 		{
 			"description": "Pull description from another option's value (e.g., a text field)",
 			"fieldname": "description_from_option",
-			"fieldtype": "Data",
+			"fieldtype": "Select",
 			"label": "Description From Option"
 		}
 	],

@@ -5,9 +5,9 @@
 	"editable_grid": 1,
 	"engine": "InnoDB",
 	"field_order": [
-		"option_name",
-		"label",
 		"field_type",
+		"label",
+		"option_name",
 		"required",
 		"column_break_defaults",
 		"default_value",

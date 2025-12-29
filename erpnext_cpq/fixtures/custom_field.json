@@ -32,5 +32,83 @@
 		"options": "Product Configurator",
 		"depends_on": "eval:doc.is_configurable",
 		"description": "The Super BOM that defines configuration options"
+	},
+	{
+		"name": "Quotation Item-product_configuration",
+		"doctype": "Custom Field",
+		"dt": "Quotation Item",
+		"module": "ERPNext CPQ",
+		"fieldname": "product_configuration",
+		"fieldtype": "Link",
+		"insert_after": "amount",
+		"label": "Product Configuration",
+		"options": "Product Configuration",
+		"read_only": 1,
+		"hidden": 1
+	},
+	{
+		"name": "Quotation Item-configuration_result",
+		"doctype": "Custom Field",
+		"dt": "Quotation Item",
+		"module": "ERPNext CPQ",
+		"fieldname": "configuration_result",
+		"fieldtype": "Link",
+		"insert_after": "product_configuration",
+		"label": "Configuration Result",
+		"options": "Configuration Result",
+		"read_only": 1,
+		"hidden": 1
+	},
+	{
+		"name": "Sales Order Item-product_configuration",
+		"doctype": "Custom Field",
+		"dt": "Sales Order Item",
+		"module": "ERPNext CPQ",
+		"fieldname": "product_configuration",
+		"fieldtype": "Link",
+		"insert_after": "amount",
+		"label": "Product Configuration",
+		"options": "Product Configuration",
+		"read_only": 1,
+		"hidden": 1
+	},
+	{
+		"name": "Sales Order Item-configuration_result",
+		"doctype": "Custom Field",
+		"dt": "Sales Order Item",
+		"module": "ERPNext CPQ",
+		"fieldname": "configuration_result",
+		"fieldtype": "Link",
+		"insert_after": "product_configuration",
+		"label": "Configuration Result",
+		"options": "Configuration Result",
+		"read_only": 1,
+		"hidden": 1
+	},
+	{
+		"name": "Sales Invoice Item-product_configuration",
+		"doctype": "Custom Field",
+		"dt": "Sales Invoice Item",
+		"module": "ERPNext CPQ",
+		"fieldname": "product_configuration",
+		"fieldtype": "Link",
+		"insert_after": "amount",
+		"label": "Product Configuration",
+		"options": "Product Configuration",
+		"read_only": 1,
+		"hidden": 1
+	},
+	{
+		"name": "Sales Invoice Item-configuration_result",
+		"doctype": "Custom Field",
+		"dt": "Sales Invoice Item",
+		"module": "ERPNext CPQ",
+		"fieldname": "configuration_result",
+		"fieldtype": "Link",
+		"insert_after": "product_configuration",
+		"label": "Configuration Result",
+		"options": "Configuration Result",
+		"read_only": 1,
+		"hidden": 1
 	}
 ]
