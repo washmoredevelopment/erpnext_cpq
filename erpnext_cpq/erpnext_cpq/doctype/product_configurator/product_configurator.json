@@ -18,6 +18,8 @@
 		"description",
 		"section_break_options",
 		"options",
+		"section_break_choices",
+		"option_choices",
 		"section_break_rules",
 		"item_rules"
 	],
@@ -81,6 +83,7 @@
 			"label": "Description"
 		},
 		{
+			"description": "Define the options customers can configure. Each option becomes a form field in the configurator dialog. Use <b>Select</b> for dropdowns (add choices below), <b>Int/Float</b> for numeric inputs, <b>Check</b> for yes/no toggles, and <b>Data</b> for free text.",
 			"fieldname": "section_break_options",
 			"fieldtype": "Section Break",
 			"label": "Configuration Options"
@@ -93,6 +96,19 @@
 			"reqd": 1
 		},
 		{
+			"description": "Define the dropdown choices for <b>Select</b> type options. Link each choice to its parent option using 'For Option'. Mark one choice as 'Default' per option to pre-select it. Choices are auto-sorted by option name.",
+			"fieldname": "section_break_choices",
+			"fieldtype": "Section Break",
+			"label": "Option Choices"
+		},
+		{
+			"fieldname": "option_choices",
+			"fieldtype": "Table",
+			"label": "Choices",
+			"options": "Option Choice"
+		},
+		{
+			"description": "Define which items to include based on customer selections. Each rule adds an item when its condition is met:<br><br><b>Condition Types:</b><br>• <b>Always</b> - Item is always included<br>• <b>When Equals</b> - Include when option equals a specific value<br>• <b>When Set</b> - Include when a checkbox is checked<br>• <b>When Not Empty</b> - Include when a text field has any value<br>• <b>When Greater/Less Than</b> - Include based on numeric comparison<br>• <b>When In List</b> - Include when value matches any in comma-separated list<br><br><b>Quantity:</b> Set Base Qty directly, or use 'Qty From Option' to pull quantity from a numeric option (multiplied by Qty Multiplier).",
 			"fieldname": "section_break_rules",
 			"fieldtype": "Section Break",
 			"label": "Item Rules"

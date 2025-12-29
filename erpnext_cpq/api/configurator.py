@@ -1,7 +1,30 @@
 # Copyright (c) 2024, washmoredevelopment and contributors
 # For license information, please see license.txt
 
+import json
+
 import frappe
+
+
+# =============================================================================
+# HELPERS
+# =============================================================================
+
+
+def _get_option_choices(configurator, option_name: str) -> list:
+	"""
+	Get choices for a specific option from the configurator's option_choices table.
+
+	Args:
+	    configurator: Product Configurator document
+	    option_name: The option name to filter by
+
+	Returns:
+	    list: List of Option Choice rows for the given option
+	"""
+	if not configurator.option_choices:
+		return []
+	return [c for c in configurator.option_choices if c.option_name == option_name]
 
 
 # =============================================================================
@@ -294,12 +317,13 @@ def get_configurator_dialog_fields(configurator_name: str) -> list:
 			"description": option.help_text,
 		}
 
-		# Handle Select type - build options from choices
+		# Handle Select type - build options from option_choices table
 		if option.field_type == "Select":
 			options = []
 			default_value = None
-			for choice in option.choices:
-				options.append(choice.value)
+			choices = _get_option_choices(configurator, option.option_name)
+			for choice in choices:
+				options.append(choice.value or "")
 				if choice.is_default:
 					default_value = choice.value
 			field["options"] = "\n".join(options)
@@ -381,9 +405,10 @@ def _get_display_value(configurator, option_name: str, value) -> str:
 	for option in configurator.options:
 		if option.option_name == option_name:
 			if option.field_type == "Select":
-				for choice in option.choices:
+				choices = _get_option_choices(configurator, option_name)
+				for choice in choices:
 					if choice.value == str(value):
-						return choice.label
+						return choice.label or choice.value or ""
 			break
 	return str(value) if value is not None else ""
 
@@ -431,8 +456,6 @@ def create_configuration(
 	Returns:
 	    str: Product Configuration name
 	"""
-	import json
-
 	if isinstance(selections, str):
 		selections = json.loads(selections)
 
