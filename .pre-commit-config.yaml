@@ -29,6 +29,7 @@ repos:
     rev: 951ccf4d5bb0d692b457a5ebc4215d755618eb68
     hooks:
       - id: black
+        exclude: 'hooks\.py$'
 
   - repo: https://github.com/PyCQA/autoflake
     rev: v2.3.1

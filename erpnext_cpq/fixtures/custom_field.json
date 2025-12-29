@@ -1,15 +1,19 @@
 [
 	{
+		"name": "Item-cpq_section",
 		"doctype": "Custom Field",
 		"dt": "Item",
+		"module": "ERPNext CPQ",
 		"fieldname": "cpq_section",
 		"fieldtype": "Section Break",
 		"insert_after": "variant_of",
 		"label": "Product Configuration"
 	},
 	{
+		"name": "Item-is_configurable",
 		"doctype": "Custom Field",
 		"dt": "Item",
+		"module": "ERPNext CPQ",
 		"fieldname": "is_configurable",
 		"fieldtype": "Check",
 		"insert_after": "cpq_section",
@@ -17,8 +21,10 @@
 		"description": "When checked, this item requires configuration before selling"
 	},
 	{
+		"name": "Item-product_configurator",
 		"doctype": "Custom Field",
 		"dt": "Item",
+		"module": "ERPNext CPQ",
 		"fieldname": "product_configurator",
 		"fieldtype": "Link",
 		"insert_after": "is_configurable",
