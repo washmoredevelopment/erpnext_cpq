@@ -1,3 +1,6 @@
+# Copyright (c) 2024, washmoredevelopment and contributors
+# For license information, please see license.txt
+
 app_name = "erpnext_cpq"
 app_title = "ERPNext CPQ"
 app_publisher = "washmoredevelopment"
