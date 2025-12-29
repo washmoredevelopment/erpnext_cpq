@@ -107,6 +107,10 @@ const CPQTransaction = {
 			return
 		}
 
+		// Store configurator and idx before potential save (idx is stable across saves)
+		const product_configurator = item._product_configurator
+		const item_idx = item.idx
+
 		// Auto-save if document is new/unsaved
 		if (frm.is_new()) {
 			frappe.show_alert(
@@ -118,6 +122,17 @@ const CPQTransaction = {
 			)
 
 			await frm.save()
+
+			// After save, temporary child names are replaced with permanent ones.
+			// Re-fetch the item row by idx to get the correct cdn.
+			const saved_item = (frm.doc.items || []).find(row => row.idx === item_idx)
+			if (!saved_item) {
+				frappe.msgprint(__('Could not find item row after save. Please try again.'))
+				return
+			}
+			// Preserve the configurator info on the newly-named row
+			saved_item._product_configurator = product_configurator
+			cdn = saved_item.name
 		}
 
 		this.open_configuration_dialog(frm, cdt, cdn)
@@ -285,10 +300,24 @@ const CPQTransaction = {
 			frappe.model.set_value(cdt, cdn, 'configuration_result', result_name)
 			frappe.model.set_value(cdt, cdn, 'rate', result_doc.total || 0)
 
-			// Append configuration summary to description
-			const current_desc = item.description || ''
+			// Update description with configuration summary
+			// Remove any existing configuration summary first (between markers)
+			let current_desc = item.description || ''
 			const summary = config_doc.configuration_summary || ''
 			if (summary) {
+				// Remove old configuration block if present (marked by ━ characters)
+				// Find first and last occurrence of the marker and remove everything between
+				const marker = '━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+				const firstMarkerIdx = current_desc.indexOf(marker)
+				if (firstMarkerIdx !== -1) {
+					const lastMarkerIdx = current_desc.lastIndexOf(marker)
+					if (lastMarkerIdx > firstMarkerIdx) {
+						// Remove from first marker to end of last marker (inclusive)
+						current_desc =
+							current_desc.substring(0, firstMarkerIdx) + current_desc.substring(lastMarkerIdx + marker.length)
+						current_desc = current_desc.replace(/\n{3,}/g, '\n\n').trim()
+					}
+				}
 				const new_desc = current_desc ? current_desc + '\n\n' + summary : summary
 				frappe.model.set_value(cdt, cdn, 'description', new_desc)
 			}

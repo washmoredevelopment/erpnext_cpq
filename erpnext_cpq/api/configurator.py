@@ -339,6 +339,7 @@ def get_configurator_dialog_fields(configurator_name: str) -> list:
 				field["max"] = option.max_value
 
 		# Handle depends_on for conditional visibility
+		# Note: Frappe dialogs populate 'doc' from get_values() before evaluating depends_on
 		if option.depends_on:
 			if option.depends_on_value:
 				# Escape single quotes in value to prevent JS syntax errors
@@ -546,26 +547,38 @@ def evaluate_configuration(
 	"""
 	# Load configuration
 	config = frappe.get_doc("Product Configuration", configuration_name)
+	configurator_doc = frappe.get_doc("Product Configurator", config.configurator)
+
+	# Build a map of option field types for proper conversion
+	field_types = {}
+	for option in configurator_doc.options:
+		field_types[option.option_name] = option.field_type
 
 	# Convert selections table to dict
 	selections = {}
 	for sel in config.selections:
-		# Try to convert to number if possible for numeric comparisons
 		val = sel.value
+		field_type = field_types.get(sel.option_name)
 
 		# Handle boolean string values (legacy data stored as "True"/"False")
 		if val == "True":
 			val = 1
 		elif val == "False":
 			val = 0
-		else:
+		elif field_type == "Check":
+			# Checkbox: convert to integer 1 or 0
+			val = 1 if val == "1" else 0
+		elif field_type in ("Int", "Float"):
+			# Numeric fields: convert to number for comparisons
 			try:
-				if "." in str(val):
+				if field_type == "Float" or "." in str(val):
 					val = float(val)
 				else:
 					val = int(val)
 			except (ValueError, TypeError):
-				pass
+				val = 0
+		# For Select, Data, and other types: keep as string for rule matching
+
 		selections[sel.option_name] = val
 
 	# Evaluate rules to get matched items
@@ -652,25 +665,32 @@ def get_configuration_selections(configuration_name: str) -> dict:
 	    dict: {option_name: value} mapping
 	"""
 	config = frappe.get_doc("Product Configuration", configuration_name)
+	configurator_doc = frappe.get_doc("Product Configurator", config.configurator)
+
+	# Build a map of option field types for proper conversion
+	field_types = {}
+	for option in configurator_doc.options:
+		field_types[option.option_name] = option.field_type
 
 	selections = {}
 	for sel in config.selections:
 		val = sel.value
+		field_type = field_types.get(sel.option_name)
 
-		# Try to convert to appropriate type for dialog
-		if val == "1":
-			# Could be a checkbox - keep as string "1" for now
-			val = 1
-		elif val == "0":
-			val = 0
-		else:
+		# Convert based on field type
+		if field_type == "Check":
+			# Checkbox: convert to integer 1 or 0
+			val = 1 if val == "1" else 0
+		elif field_type in ("Int", "Float"):
+			# Numeric fields: convert to number
 			try:
-				if "." in str(val):
+				if field_type == "Float" or "." in str(val):
 					val = float(val)
 				else:
 					val = int(val)
 			except (ValueError, TypeError):
-				pass
+				val = 0
+		# For Select, Data, and other types: keep as string
 
 		selections[sel.option_name] = val
 

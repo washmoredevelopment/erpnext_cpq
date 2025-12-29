@@ -13,23 +13,14 @@ def validate_promotional_scheme(doc, method):
 	"""
 	configurable_items = []
 
-	# Check price discount slabs for item-based rules
-	for slab in doc.get("price_discount_slabs") or []:
-		if slab.apply_on == "Item Code":
-			for item_row in doc.get("items") or []:
-				if item_row.item_code:
-					is_configurable = frappe.db.get_value("Item", item_row.item_code, "is_configurable")
-					if is_configurable and item_row.item_code not in configurable_items:
-						configurable_items.append(item_row.item_code)
-
-	# Check product discount slabs for item-based rules
-	for slab in doc.get("product_discount_slabs") or []:
-		if slab.apply_on == "Item Code":
-			for item_row in doc.get("items") or []:
-				if item_row.item_code:
-					is_configurable = frappe.db.get_value("Item", item_row.item_code, "is_configurable")
-					if is_configurable and item_row.item_code not in configurable_items:
-						configurable_items.append(item_row.item_code)
+	# Check if scheme applies to Item Code - the apply_on is at document level
+	if doc.apply_on == "Item Code":
+		# Check items in the items child table
+		for item_row in doc.get("items") or []:
+			if item_row.item_code:
+				is_configurable = frappe.db.get_value("Item", item_row.item_code, "is_configurable")
+				if is_configurable and item_row.item_code not in configurable_items:
+					configurable_items.append(item_row.item_code)
 
 	if configurable_items:
 		frappe.throw(
