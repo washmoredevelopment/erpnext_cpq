@@ -16,6 +16,7 @@ class OptionChoice(Document):
 		description: DF.SmallText | None
 		is_default: DF.Check
 		label: DF.Data
+		option_name: DF.Data
 		parent: DF.Data
 		parentfield: DF.Data
 		parenttype: DF.Data

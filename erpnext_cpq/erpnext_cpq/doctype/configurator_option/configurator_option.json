@@ -17,12 +17,11 @@
 		"min_value",
 		"max_value",
 		"column_break_help",
-		"help_text",
-		"section_break_choices",
-		"choices"
+		"help_text"
 	],
 	"fields": [
 		{
+			"description": "Internal identifier used in rules (no spaces, e.g., 'cpu', 'ram_size')",
 			"fieldname": "option_name",
 			"fieldtype": "Data",
 			"in_list_view": 1,
@@ -94,21 +93,10 @@
 			"fieldtype": "Column Break"
 		},
 		{
+			"description": "Shown below the field in the configurator dialog to guide users",
 			"fieldname": "help_text",
 			"fieldtype": "Small Text",
 			"label": "Help Text"
-		},
-		{
-			"depends_on": "eval:doc.field_type === 'Select'",
-			"fieldname": "section_break_choices",
-			"fieldtype": "Section Break",
-			"label": "Choices"
-		},
-		{
-			"fieldname": "choices",
-			"fieldtype": "Table",
-			"label": "Choices",
-			"options": "Option Choice"
 		}
 	],
 	"index_web_pages_for_search": 0,
