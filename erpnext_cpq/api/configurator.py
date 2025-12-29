@@ -307,10 +307,11 @@ def get_configurator_dialog_fields(configurator_name: str) -> list:
 				field["default"] = default_value
 
 		# Handle Int/Float - set min/max
+		# Note: Frappe Float fields default to 0 when not set, so we treat 0 as "not configured"
 		if option.field_type in ("Int", "Float"):
-			if option.min_value is not None:
+			if option.min_value:
 				field["min"] = option.min_value
-			if option.max_value is not None:
+			if option.max_value:
 				field["max"] = option.max_value
 
 		# Handle depends_on for conditional visibility
