@@ -6,6 +6,11 @@ frappe.ui.form.on('Product Configurator', {
 		update_option_choices_select(frm)
 		update_item_rules_selects(frm)
 		sort_option_choices(frm)
+		validate_option_choices(frm)
+	},
+	validate(frm) {
+		// Validate Option Choices before save
+		validate_option_choices(frm)
 	},
 	options_add(frm, cdt, cdn) {
 		// Update the Select options when a new option is added
@@ -50,6 +55,31 @@ frappe.ui.form.on('Configurator Option', {
 	option_name(frm, cdt, cdn) {
 		// Update the Select options when an option name changes
 		update_option_choices_select(frm)
+		update_item_rules_selects(frm)
+	},
+	field_type(frm, cdt, cdn) {
+		// Update Option Choices dropdown when field type changes
+		// Only Select-type options appear in the Option Choices dropdown
+		update_option_choices_select(frm)
+
+		// Warn if changing away from Select and choices exist
+		const row = frappe.get_doc(cdt, cdn)
+		if (row.field_type !== 'Select' && row.option_name) {
+			const orphaned_choices = (frm.doc.option_choices || []).filter(c => c.option_name === row.option_name)
+			if (orphaned_choices.length > 0) {
+				frappe.show_alert(
+					{
+						message: __('Note: {0} has {1} choice(s) defined that will be ignored since field type is now {2}', [
+							row.option_name,
+							orphaned_choices.length,
+							row.field_type,
+						]),
+						indicator: 'orange',
+					},
+					5
+				)
+			}
+		}
 	},
 })
 
@@ -71,17 +101,40 @@ frappe.ui.form.on('Option Choice', {
 })
 
 function update_option_choices_select(frm) {
-	// Build options list from the Options table
-	const option_names = (frm.doc.options || []).map(opt => opt.option_name).filter(name => name) // Filter out empty names
+	// Build options list from the Options table - ONLY include Select-type options
+	// Other field types (Int, Float, Check, Data) don't use dropdown choices
+	const select_options = (frm.doc.options || [])
+		.filter(opt => opt.field_type === 'Select' && opt.option_name)
+		.map(opt => opt.option_name)
 
 	// Create newline-separated options string for Select field
-	const options_str = option_names.join('\n')
+	const options_str = select_options.join('\n')
 
 	// Update the option_name field options in the Option Choice grid
 	frm.fields_dict.option_choices.grid.update_docfield_property('option_name', 'options', options_str)
 
+	// Update the section description to show which options need choices
+	update_option_choices_section_description(frm, select_options)
+
 	// Refresh the grid to show updated options
 	frm.fields_dict.option_choices.grid.refresh()
+}
+
+function update_option_choices_section_description(frm, select_options) {
+	// Update the Option Choices section to indicate which options need choices defined
+	const section_field = frm.fields_dict.section_break_choices
+	if (!section_field) return
+
+	if (select_options.length === 0) {
+		section_field.set_description(
+			'<span class="text-muted">No Select-type options defined. ' +
+				'Option Choices are only used for <b>Select</b> field types.</span>'
+		)
+	} else {
+		section_field.set_description(
+			'Define dropdown choices for Select-type options: <b>' + select_options.join('</b>, <b>') + '</b>'
+		)
+	}
 }
 
 function sort_option_choices(frm) {
@@ -149,6 +202,35 @@ function update_option_value_for_row(frm, cdt, cdn) {
 	// But the available choices shown should still be helpful
 	frm.fields_dict.item_rules.grid.update_docfield_property('option_value', 'options', choices_str)
 	frm.fields_dict.item_rules.grid.refresh()
+}
+
+/**
+ * Validate that Option Choices only reference Select-type options
+ * Warns about orphaned choices that will be ignored
+ */
+function validate_option_choices(frm) {
+	if (!frm.doc.option_choices?.length) return
+
+	// Get list of Select-type option names
+	const select_options = new Set(
+		(frm.doc.options || []).filter(opt => opt.field_type === 'Select' && opt.option_name).map(opt => opt.option_name)
+	)
+
+	// Find orphaned choices (referencing non-Select or non-existent options)
+	const orphaned = (frm.doc.option_choices || []).filter(c => c.option_name && !select_options.has(c.option_name))
+
+	if (orphaned.length > 0) {
+		const orphan_names = [...new Set(orphaned.map(c => c.option_name))]
+		frappe.msgprint({
+			title: __('Orphaned Option Choices'),
+			indicator: 'orange',
+			message: __(
+				'The following Option Choices reference options that are not Select-type and will be ignored: <b>{0}</b><br><br>' +
+					"Consider removing these choices or changing the option's field type back to Select.",
+				[orphan_names.join(', ')]
+			),
+		})
+	}
 }
 
 /**
