@@ -84,8 +84,21 @@ const CPQTransaction = {
 		})
 
 		// Clean up buttons on mouse leave
+		// Check relatedTarget to avoid removing button when moving to it
 		$wrapper.off('mouseleave.cpq', '.grid-row').on('mouseleave.cpq', '.grid-row', e => {
-			$(e.currentTarget).find('.cpq-inline-configure-btn').remove()
+			const $row = $(e.currentTarget)
+			const $relatedTarget = $(e.relatedTarget)
+
+			// Don't remove if moving to the button or its children
+			if ($relatedTarget.closest('.cpq-inline-configure-btn').length) {
+				return
+			}
+			// Don't remove if moving to a child of this row
+			if ($relatedTarget.closest($row).length) {
+				return
+			}
+
+			$row.find('.cpq-inline-configure-btn').remove()
 		})
 	},
 
@@ -141,6 +154,15 @@ const CPQTransaction = {
 			const cdn = item.name
 			// Use on_configure_click to ensure document is saved before opening dialog
 			this.on_configure_click(frm, cdt, cdn)
+		})
+
+		// Remove button when leaving it to outside the row
+		$btn.on('mouseleave', e => {
+			const $relatedTarget = $(e.relatedTarget)
+			// Only remove if not moving back into the row
+			if (!$relatedTarget.closest($row).length) {
+				$btn.remove()
+			}
 		})
 
 		$item_code_cell.append($btn)
