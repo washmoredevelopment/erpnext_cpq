@@ -47,7 +47,10 @@ app_license = "agpl-3.0"
 
 # include js in doctype views
 doctype_js = {
-	"Product Configurator": "erpnext_cpq/doctype/product_configurator/product_configurator.js"
+	"Product Configurator": "erpnext_cpq/doctype/product_configurator/product_configurator.js",
+	"Quotation": "public/js/cpq_transaction.js",
+	"Sales Order": "public/js/cpq_transaction.js",
+	"Sales Invoice": "public/js/cpq_transaction.js",
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
@@ -145,7 +148,22 @@ doctype_js = {
 doc_events = {
 	"Item": {
 		"validate": "erpnext_cpq.overrides.item.validate_item_configuration"
-	}
+	},
+	"Quotation": {
+		"validate": "erpnext_cpq.overrides.transaction.validate_configurable_items"
+	},
+	"Sales Order": {
+		"validate": "erpnext_cpq.overrides.transaction.validate_configurable_items"
+	},
+	"Sales Invoice": {
+		"validate": "erpnext_cpq.overrides.transaction.validate_configurable_items"
+	},
+	"Pricing Rule": {
+		"validate": "erpnext_cpq.overrides.pricing_rule.validate_pricing_rule"
+	},
+	"Promotional Scheme": {
+		"validate": "erpnext_cpq.overrides.promotional_scheme.validate_promotional_scheme"
+	},
 }
 
 # Scheduled Tasks

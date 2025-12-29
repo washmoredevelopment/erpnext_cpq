@@ -11,6 +11,7 @@
 		"column_break_totals",
 		"currency",
 		"total",
+		"max_discount",
 		"section_break_items",
 		"items"
 	],
@@ -49,6 +50,13 @@
 			"label": "Total",
 			"options": "currency",
 			"read_only": 1
+		},
+		{
+			"fieldname": "max_discount",
+			"fieldtype": "Percent",
+			"label": "Max Discount",
+			"read_only": 1,
+			"description": "Weighted average max discount from child items"
 		},
 		{
 			"fieldname": "section_break_items",
