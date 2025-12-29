@@ -13,44 +13,170 @@
 // =============================================================================
 
 const CPQTransaction = {
+	// Cache for item configurability to avoid repeated DB lookups
+	_configurable_cache: {},
+
 	/**
 	 * Initialize CPQ handlers for a transaction form
 	 * @param {Object} frm - Frappe form object
 	 */
 	init(frm) {
-		// Refresh configure buttons visibility on form load
-		this.refresh_configure_buttons(frm)
+		// Add inline button hover handlers to the items grid
+		this.setup_inline_buttons(frm)
+		// Pre-cache configurability for all items
+		this.cache_configurable_items(frm)
 	},
 
 	/**
-	 * Refresh visibility of configure buttons for all items
+	 * Setup hover-based inline configure buttons
 	 * @param {Object} frm - Frappe form object
 	 */
-	refresh_configure_buttons(frm) {
-		const items = frm.doc.items || []
-		items.forEach((item, idx) => {
-			this.update_configure_button_visibility(frm, item)
+	setup_inline_buttons(frm) {
+		const grid = frm.fields_dict.items?.grid
+		if (!grid) return
+
+		const $wrapper = grid.wrapper
+
+		// Inject CSS for inline button (only once)
+		if (!$('#cpq-inline-btn-style').length) {
+			$('head').append(`
+				<style id="cpq-inline-btn-style">
+					.cpq-inline-configure-btn {
+						position: absolute;
+						right: 8px;
+						top: 50%;
+						transform: translateY(-50%);
+						padding: 2px 8px;
+						font-size: 11px;
+						background: var(--primary);
+						color: white;
+						border: none;
+						border-radius: 4px;
+						cursor: pointer;
+						z-index: 10;
+						opacity: 0;
+						transition: opacity 0.15s;
+					}
+					.cpq-inline-configure-btn:hover {
+						background: var(--primary-dark);
+					}
+					.grid-row:hover .cpq-inline-configure-btn {
+						opacity: 1;
+					}
+					.grid-row .item-code-cell {
+						position: relative;
+					}
+				</style>
+			`)
+		}
+
+		// Handle row rendering to inject buttons
+		$wrapper.off('mouseenter.cpq', '.grid-row').on('mouseenter.cpq', '.grid-row', e => {
+			const $row = $(e.currentTarget)
+			const row_idx = $row.data('idx')
+			if (!row_idx) return
+
+			const item = (frm.doc.items || []).find(i => i.idx === row_idx)
+			if (!item || !item.item_code) return
+
+			// Check cache for configurability
+			this.check_and_inject_button(frm, item, $row)
+		})
+
+		// Clean up buttons on mouse leave
+		$wrapper.off('mouseleave.cpq', '.grid-row').on('mouseleave.cpq', '.grid-row', e => {
+			$(e.currentTarget).find('.cpq-inline-configure-btn').remove()
 		})
 	},
 
 	/**
-	 * Update configure button visibility for a single item row
-	 * @param {Object} frm - Frappe form object
-	 * @param {Object} item - Item row
+	 * Check if item is configurable and inject button
 	 */
-	update_configure_button_visibility(frm, item) {
-		if (!item.item_code) return
+	check_and_inject_button(frm, item, $row) {
+		const item_code = item.item_code
+		const cached = this._configurable_cache[item_code]
 
-		// Check if item is configurable
-		frappe.db.get_value('Item', item.item_code, ['is_configurable', 'product_configurator']).then(r => {
-			if (r.message && r.message.is_configurable) {
-				// Item is configurable - store configurator info on row for later use
-				item._is_configurable = true
-				item._product_configurator = r.message.product_configurator
-				frm.refresh_field('items')
-			} else {
-				item._is_configurable = false
-				item._product_configurator = null
+		if (cached === undefined) {
+			// Not in cache yet - fetch and cache
+			frappe.db.get_value('Item', item_code, ['is_configurable', 'product_configurator']).then(r => {
+				if (r.message && r.message.is_configurable) {
+					this._configurable_cache[item_code] = r.message.product_configurator
+					item._is_configurable = true
+					item._product_configurator = r.message.product_configurator
+					this.inject_configure_button(frm, item, $row)
+				} else {
+					this._configurable_cache[item_code] = false
+					item._is_configurable = false
+				}
+			})
+		} else if (cached) {
+			item._is_configurable = true
+			item._product_configurator = cached
+			this.inject_configure_button(frm, item, $row)
+		}
+	},
+
+	/**
+	 * Inject the configure button into the item_code cell
+	 */
+	inject_configure_button(frm, item, $row) {
+		// Find the item_code cell
+		const $item_code_cell = $row.find('[data-fieldname="item_code"]')
+		if (!$item_code_cell.length) return
+
+		// Don't add duplicate buttons
+		if ($item_code_cell.find('.cpq-inline-configure-btn').length) return
+
+		// Make cell relative for absolute positioning
+		$item_code_cell.css('position', 'relative')
+
+		// Create and inject button
+		const btn_text = item.product_configuration ? __('Reconfigure') : __('Configure')
+		const $btn = $(`<button class="cpq-inline-configure-btn">${btn_text}</button>`)
+
+		$btn.on('click', e => {
+			e.stopPropagation()
+			e.preventDefault()
+			const cdt = item.doctype
+			const cdn = item.name
+			this.open_configuration_dialog(frm, cdt, cdn)
+		})
+
+		$item_code_cell.append($btn)
+	},
+
+	/**
+	 * Cache configurability for all items on form load
+	 * @param {Object} frm - Frappe form object
+	 */
+	cache_configurable_items(frm) {
+		const items = frm.doc.items || []
+		const item_codes = [...new Set(items.map(i => i.item_code).filter(Boolean))]
+
+		if (!item_codes.length) return
+
+		// Batch fetch all item configurability
+		frappe.call({
+			method: 'frappe.client.get_list',
+			args: {
+				doctype: 'Item',
+				filters: { name: ['in', item_codes], is_configurable: 1 },
+				fields: ['name', 'product_configurator'],
+			},
+			async: false,
+			callback: r => {
+				if (r.message) {
+					r.message.forEach(item => {
+						this._configurable_cache[item.name] = item.product_configurator
+					})
+				}
+			},
+		})
+
+		// Mark non-configurable items
+		item_codes.forEach(code => {
+			if (this._configurable_cache[code] === undefined) {
+				this._configurable_cache[code] = false
 			}
 		})
 	},
@@ -69,16 +195,37 @@ const CPQTransaction = {
 			return
 		}
 
-		frappe.db.get_value('Item', item.item_code, ['is_configurable', 'product_configurator']).then(r => {
-			if (r.message && r.message.is_configurable) {
-				item._is_configurable = true
-				item._product_configurator = r.message.product_configurator
-				frm.refresh_field('items')
+		const item_code = item.item_code
+		const cached = this._configurable_cache[item_code]
 
-				// Auto-open configuration dialog for new configurable items
-				if (!item.product_configuration) {
-					this.open_configuration_dialog(frm, cdt, cdn)
-				}
+		const handle_configurable = configurator => {
+			item._is_configurable = true
+			item._product_configurator = configurator
+			this._configurable_cache[item_code] = configurator
+
+			// Auto-open configuration dialog for new configurable items
+			if (!item.product_configuration) {
+				this.open_configuration_dialog(frm, cdt, cdn)
+			}
+		}
+
+		if (cached !== undefined) {
+			if (cached) {
+				handle_configurable(cached)
+			} else {
+				item._is_configurable = false
+				item._product_configurator = null
+			}
+			return
+		}
+
+		frappe.db.get_value('Item', item_code, ['is_configurable', 'product_configurator']).then(r => {
+			if (r.message && r.message.is_configurable) {
+				handle_configurable(r.message.product_configurator)
+			} else {
+				item._is_configurable = false
+				item._product_configurator = null
+				this._configurable_cache[item_code] = false
 			}
 		})
 	},
@@ -179,9 +326,21 @@ const CPQTransaction = {
 		}
 
 		// Apply existing values to fields
+		// For Select fields, convert stored values back to display labels
 		dialog_fields.forEach(field => {
 			if (existing_selections.hasOwnProperty(field.fieldname)) {
-				field.default = existing_selections[field.fieldname]
+				let value = existing_selections[field.fieldname]
+				// If this is a Select field with label mapping, convert value to label
+				if (field.label_to_value_map) {
+					// Reverse lookup: find label for this value
+					for (const [label, val] of Object.entries(field.label_to_value_map)) {
+						if (val === value || val === String(value)) {
+							value = label
+							break
+						}
+					}
+				}
+				field.default = value
 			}
 			// Make fields read-only if document is submitted
 			if (is_submitted) {
@@ -201,6 +360,14 @@ const CPQTransaction = {
 			})
 		}
 
+		// Build a combined label-to-value mapping for all Select fields
+		const label_to_value_maps = {}
+		dialog_fields.forEach(field => {
+			if (field.label_to_value_map) {
+				label_to_value_maps[field.fieldname] = field.label_to_value_map
+			}
+		})
+
 		// Create dialog
 		const dialog = new frappe.ui.Dialog({
 			title: __('Configure Product'),
@@ -212,7 +379,9 @@ const CPQTransaction = {
 					dialog.hide()
 					return
 				}
-				this.apply_configuration(frm, cdt, cdn, values, existing_config, before_state, dialog)
+				// Convert labels back to internal values for Select fields
+				const converted_values = this.convert_labels_to_values(values, label_to_value_maps)
+				this.apply_configuration(frm, cdt, cdn, converted_values, existing_config, before_state, dialog)
 			},
 		})
 
@@ -301,23 +470,29 @@ const CPQTransaction = {
 			frappe.model.set_value(cdt, cdn, 'rate', result_doc.total || 0)
 
 			// Update description with configuration summary
-			// Remove any existing configuration summary first (between markers)
+			// Remove any existing configuration summary first
 			let current_desc = item.description || ''
 			const summary = config_doc.configuration_summary || ''
 			if (summary) {
-				// Remove old configuration block if present (marked by ━ characters)
-				// Find first and last occurrence of the marker and remove everything between
-				const marker = '━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
-				const firstMarkerIdx = current_desc.indexOf(marker)
+				// Remove old configuration block if present
+				// Handle legacy format (with ━ markers)
+				const legacy_marker = '━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+				const firstMarkerIdx = current_desc.indexOf(legacy_marker)
 				if (firstMarkerIdx !== -1) {
-					const lastMarkerIdx = current_desc.lastIndexOf(marker)
+					const lastMarkerIdx = current_desc.lastIndexOf(legacy_marker)
 					if (lastMarkerIdx > firstMarkerIdx) {
-						// Remove from first marker to end of last marker (inclusive)
 						current_desc =
-							current_desc.substring(0, firstMarkerIdx) + current_desc.substring(lastMarkerIdx + marker.length)
-						current_desc = current_desc.replace(/\n{3,}/g, '\n\n').trim()
+							current_desc.substring(0, firstMarkerIdx) + current_desc.substring(lastMarkerIdx + legacy_marker.length)
 					}
 				}
+
+				// Handle new format: "Configuration:" followed by bullet lines
+				// Use regex to match the entire block
+				current_desc = current_desc.replace(/Configuration:\n(• [^\n]+\n?)*/g, '')
+
+				// Clean up extra newlines
+				current_desc = current_desc.replace(/\n{3,}/g, '\n\n').trim()
+
 				const new_desc = current_desc ? current_desc + '\n\n' + summary : summary
 				frappe.model.set_value(cdt, cdn, 'description', new_desc)
 			}
@@ -340,6 +515,25 @@ const CPQTransaction = {
 				indicator: 'red',
 			})
 		}
+	},
+
+	/**
+	 * Convert Select field labels back to internal values
+	 * @param {Object} values - Dialog values (may contain labels for Select fields)
+	 * @param {Object} label_to_value_maps - Mapping per field {fieldname: {label: value}}
+	 * @returns {Object} Values with labels converted to internal values
+	 */
+	convert_labels_to_values(values, label_to_value_maps) {
+		const converted = { ...values }
+		for (const [fieldname, mapping] of Object.entries(label_to_value_maps)) {
+			if (converted.hasOwnProperty(fieldname)) {
+				const label = converted[fieldname]
+				if (mapping.hasOwnProperty(label)) {
+					converted[fieldname] = mapping[label]
+				}
+			}
+		}
+		return converted
 	},
 
 	/**
@@ -385,28 +579,12 @@ function setup_cpq_handlers(doctype, item_doctype) {
 		refresh(frm) {
 			CPQTransaction.init(frm)
 		},
-
-		onload(frm) {
-			CPQTransaction.refresh_configure_buttons(frm)
-		},
 	})
 
 	// Child table events
 	frappe.ui.form.on(item_doctype, {
 		item_code(frm, cdt, cdn) {
 			CPQTransaction.on_item_code_change(frm, cdt, cdn)
-		},
-
-		configure_btn(frm, cdt, cdn) {
-			CPQTransaction.on_configure_click(frm, cdt, cdn)
-		},
-
-		items_add(frm, cdt, cdn) {
-			// Handle new row added
-		},
-
-		items_remove(frm, cdt, cdn) {
-			// Handle row removed - could clean up orphan configurations
 		},
 	})
 }

@@ -318,17 +318,25 @@ def get_configurator_dialog_fields(configurator_name: str) -> list:
 		}
 
 		# Handle Select type - build options from option_choices table
+		# Show labels in the dropdown for better UX, but store the internal value
 		if option.field_type == "Select":
 			options = []
 			default_value = None
+			label_to_value_map = {}
 			choices = _get_option_choices(configurator, option.option_name)
 			for choice in choices:
-				options.append(choice.value or "")
+				# Use label as the displayed option
+				display = choice.label or choice.value or ""
+				options.append(display)
+				# Store mapping for value lookup
+				label_to_value_map[display] = choice.value or ""
 				if choice.is_default:
-					default_value = choice.value
+					default_value = display  # Default is also the label
 			field["options"] = "\n".join(options)
 			if default_value and not field.get("default"):
 				field["default"] = default_value
+			# Store the mapping in the field for client-side lookup
+			field["label_to_value_map"] = label_to_value_map
 
 		# Handle Int/Float - set min/max
 		# Note: Frappe Float fields default to 0 when not set, so we treat 0 as "not configured"
@@ -367,12 +375,10 @@ def build_configuration_summary(selections: list, configurator) -> str:
 	    configurator: Product Configurator doc
 
 	Returns:
-	    str: Formatted summary text
+	    str: Formatted summary text as a simple bullet list
 	"""
 	lines = []
-	lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	lines.append("CONFIGURATION")
-	lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	lines.append("Configuration:")
 
 	for selection in selections:
 		label = selection.option_label or selection.option_name
@@ -387,8 +393,6 @@ def build_configuration_summary(selections: list, configurator) -> str:
 				value = "No"
 
 		lines.append(f"• {label}: {value}")
-
-	lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
 	return "\n".join(lines)
 
