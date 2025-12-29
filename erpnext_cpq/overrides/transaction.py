@@ -50,7 +50,7 @@ def _validate_max_discount(doc, item):
 		"Configuration Result", item.configuration_result, "max_discount"
 	)
 
-	if not max_discount:
+	if max_discount is None:
 		# No max discount set - skip validation
 		return
 

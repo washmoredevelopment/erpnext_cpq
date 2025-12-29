@@ -677,8 +677,12 @@ def get_configuration_selections(configuration_name: str) -> dict:
 		val = sel.value
 		field_type = field_types.get(sel.option_name)
 
-		# Convert based on field type
-		if field_type == "Check":
+		# Handle boolean string values (legacy data stored as "True"/"False")
+		if val == "True":
+			val = 1
+		elif val == "False":
+			val = 0
+		elif field_type == "Check":
 			# Checkbox: convert to integer 1 or 0
 			val = 1 if val == "1" else 0
 		elif field_type in ("Int", "Float"):
