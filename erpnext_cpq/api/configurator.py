@@ -267,7 +267,18 @@ def get_item_prices(items: dict, args: dict) -> dict:
 				}
 			)
 			rate = item_details.get("price_list_rate") or 0
-		except Exception:
+		except Exception as e:
+			frappe.log_error(
+				title=f"CPQ Pricing Error: {item_code}",
+				message=f"Failed to get price for item {item_code}: {str(e)}",
+			)
+			frappe.msgprint(
+				frappe._(
+					"Could not retrieve price for item {0}. Using rate of 0. " "Check Error Log for details."
+				).format(item_code),
+				indicator="orange",
+				alert=True,
+			)
 			rate = 0
 
 		item_data["rate"] = rate
@@ -433,7 +444,8 @@ def _get_option_label(configurator, option_name: str) -> str:
 	"""
 	for option in configurator.options:
 		if option.option_name == option_name:
-			return option.label
+			# Fall back to option_name if label is None or empty
+			return option.label if option.label else option_name
 	return option_name
 
 

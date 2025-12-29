@@ -139,7 +139,8 @@ const CPQTransaction = {
 			e.preventDefault()
 			const cdt = item.doctype
 			const cdn = item.name
-			this.open_configuration_dialog(frm, cdt, cdn)
+			// Use on_configure_click to ensure document is saved before opening dialog
+			this.on_configure_click(frm, cdt, cdn)
 		})
 
 		$item_code_cell.append($btn)
@@ -147,6 +148,9 @@ const CPQTransaction = {
 
 	/**
 	 * Cache configurability for all items on form load
+	 * Uses async fetch to avoid blocking the UI thread.
+	 * The check_and_inject_button fallback handles any items
+	 * accessed before the cache is populated.
 	 * @param {Object} frm - Frappe form object
 	 */
 	cache_configurable_items(frm) {
@@ -155,7 +159,7 @@ const CPQTransaction = {
 
 		if (!item_codes.length) return
 
-		// Batch fetch all item configurability
+		// Batch fetch all item configurability asynchronously
 		frappe.call({
 			method: 'frappe.client.get_list',
 			args: {
@@ -163,21 +167,19 @@ const CPQTransaction = {
 				filters: { name: ['in', item_codes], is_configurable: 1 },
 				fields: ['name', 'product_configurator'],
 			},
-			async: false,
 			callback: r => {
 				if (r.message) {
 					r.message.forEach(item => {
 						this._configurable_cache[item.name] = item.product_configurator
 					})
 				}
+				// Mark non-configurable items after async response
+				item_codes.forEach(code => {
+					if (this._configurable_cache[code] === undefined) {
+						this._configurable_cache[code] = false
+					}
+				})
 			},
-		})
-
-		// Mark non-configurable items
-		item_codes.forEach(code => {
-			if (this._configurable_cache[code] === undefined) {
-				this._configurable_cache[code] = false
-			}
 		})
 	},
 
@@ -204,8 +206,9 @@ const CPQTransaction = {
 			this._configurable_cache[item_code] = configurator
 
 			// Auto-open configuration dialog for new configurable items
+			// Use on_configure_click to ensure document is saved before opening dialog
 			if (!item.product_configuration) {
-				this.open_configuration_dialog(frm, cdt, cdn)
+				this.on_configure_click(frm, cdt, cdn)
 			}
 		}
 

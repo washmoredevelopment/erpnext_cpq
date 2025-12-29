@@ -177,30 +177,54 @@ function update_item_rules_selects(frm) {
 }
 
 /**
- * Update option_value choices for a specific item rule row based on selected option_name
+ * Update option_value field description based on selected option_name.
+ * Since option_value is a Data field (not Select), we can't use dropdown choices.
+ * Instead, we show available choices in the field description as guidance.
  */
 function update_option_value_for_row(frm, cdt, cdn) {
 	const row = frappe.get_doc(cdt, cdn)
 	const selected_option = row.option_name
 
-	if (!selected_option) {
-		// Clear option_value choices if no option selected
+	// Find the option definition to check its field type
+	const option_def = (frm.doc.options || []).find(opt => opt.option_name === selected_option)
+
+	if (!option_def) {
+		// Reset description to default if no valid option selected
+		frm.fields_dict.item_rules.grid.update_docfield_property(
+			'option_value',
+			'description',
+			'Value to compare against. For "When Equals", use exact values. For numeric/list, enter manually.'
+		)
+		frm.fields_dict.item_rules.grid.refresh()
 		return
 	}
 
-	// Get choices for the selected option
-	const choices = (frm.doc.option_choices || [])
-		.filter(c => c.option_name === selected_option)
-		.map(c => c.value)
-		.filter(v => v)
+	// Build context-aware description based on option type
+	let description = ''
 
-	// Add empty option at start
-	const choices_str = [''].concat(choices).join('\n')
+	if (option_def.field_type === 'Select') {
+		// Get available choices for this Select option
+		const choices = (frm.doc.option_choices || [])
+			.filter(c => c.option_name === selected_option)
+			.map(c => c.value)
+			.filter(v => v)
 
-	// Update this specific row's option_value field
-	// Since we can't update per-row, we update the grid column
-	// But the available choices shown should still be helpful
-	frm.fields_dict.item_rules.grid.update_docfield_property('option_value', 'options', choices_str)
+		if (choices.length > 0) {
+			description = `Available choices for <b>${selected_option}</b>: ${choices.join(', ')}`
+		} else {
+			description = `No choices defined for <b>${selected_option}</b>. Add them in Option Choices.`
+		}
+	} else if (option_def.field_type === 'Check') {
+		description = `<b>${selected_option}</b> is a checkbox. Use "When Set" condition type instead.`
+	} else if (option_def.field_type === 'Int' || option_def.field_type === 'Float') {
+		const min = option_def.min_value !== undefined ? option_def.min_value : 'none'
+		const max = option_def.max_value !== undefined ? option_def.max_value : 'none'
+		description = `<b>${selected_option}</b> is numeric (min: ${min}, max: ${max}). Enter a number to compare.`
+	} else {
+		description = `<b>${selected_option}</b> is a text field. Enter the exact value to match.`
+	}
+
+	frm.fields_dict.item_rules.grid.update_docfield_property('option_value', 'description', description)
 	frm.fields_dict.item_rules.grid.refresh()
 }
 
