@@ -146,7 +146,11 @@ def get_description(rule, selections: dict) -> str | None:
 	if rule.description_override:
 		return rule.description_override
 	elif rule.description_from_option:
-		return str(selections.get(rule.description_from_option) or "")
+		val = selections.get(rule.description_from_option)
+		# Return None if value is missing/empty so item default is used
+		if val is not None and str(val).strip() != "":
+			return str(val)
+		return None
 	else:
 		return None
 
@@ -184,6 +188,9 @@ def evaluate_rules(configurator_name: str, selections: dict) -> dict:
 			if item_code in result_items:
 				# Same item from multiple rules: add quantities
 				result_items[item_code]["qty"] += qty
+				# Check if this rule has a description override and existing doesn't
+				if result_items[item_code]["description"] is None:
+					result_items[item_code]["description"] = get_description(rule, selections)
 			else:
 				result_items[item_code] = {
 					"item_code": item_code,
@@ -309,7 +316,9 @@ def get_configurator_dialog_fields(configurator_name: str) -> list:
 		# Handle depends_on for conditional visibility
 		if option.depends_on:
 			if option.depends_on_value:
-				field["depends_on"] = f"eval:doc.{option.depends_on} == '{option.depends_on_value}'"
+				# Escape single quotes in value to prevent JS syntax errors
+				escaped_value = option.depends_on_value.replace("\\", "\\\\").replace("'", "\\'")
+				field["depends_on"] = f"eval:doc.{option.depends_on} == '{escaped_value}'"
 			else:
 				field["depends_on"] = f"eval:doc.{option.depends_on}"
 
