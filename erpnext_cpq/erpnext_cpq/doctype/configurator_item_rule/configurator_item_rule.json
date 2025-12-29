@@ -1,0 +1,123 @@
+{
+	"actions": [],
+	"creation": "2024-12-29 00:00:00.000000",
+	"doctype": "DocType",
+	"editable_grid": 1,
+	"engine": "InnoDB",
+	"field_order": [
+		"item_code",
+		"item_name",
+		"base_qty",
+		"column_break_condition",
+		"condition_type",
+		"option_name",
+		"option_value",
+		"comparison",
+		"column_break_qty",
+		"qty_from_option",
+		"qty_multiplier",
+		"section_break_description",
+		"description_override",
+		"description_from_option"
+	],
+	"fields": [
+		{
+			"fieldname": "item_code",
+			"fieldtype": "Link",
+			"in_list_view": 1,
+			"label": "Item",
+			"options": "Item",
+			"reqd": 1
+		},
+		{
+			"fetch_from": "item_code.item_name",
+			"fieldname": "item_name",
+			"fieldtype": "Data",
+			"in_list_view": 1,
+			"label": "Item Name",
+			"read_only": 1
+		},
+		{
+			"default": "1",
+			"fieldname": "base_qty",
+			"fieldtype": "Float",
+			"in_list_view": 1,
+			"label": "Base Quantity",
+			"reqd": 1
+		},
+		{
+			"fieldname": "column_break_condition",
+			"fieldtype": "Column Break"
+		},
+		{
+			"default": "Always",
+			"fieldname": "condition_type",
+			"fieldtype": "Select",
+			"in_list_view": 1,
+			"label": "Condition Type",
+			"options": "Always\nWhen Equals\nWhen Set\nWhen Not Empty\nWhen Greater Than\nWhen Less Than\nWhen In List",
+			"reqd": 1
+		},
+		{
+			"depends_on": "eval:doc.condition_type !== 'Always'",
+			"fieldname": "option_name",
+			"fieldtype": "Data",
+			"label": "Option Name"
+		},
+		{
+			"depends_on": "eval:['When Equals', 'When Greater Than', 'When Less Than', 'When In List'].includes(doc.condition_type)",
+			"fieldname": "option_value",
+			"fieldtype": "Data",
+			"label": "Option Value"
+		},
+		{
+			"depends_on": "eval:['When Greater Than', 'When Less Than'].includes(doc.condition_type)",
+			"fieldname": "comparison",
+			"fieldtype": "Select",
+			"label": "Comparison",
+			"options": "\n>\n>=\n<\n<=\n="
+		},
+		{
+			"fieldname": "column_break_qty",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "qty_from_option",
+			"fieldtype": "Data",
+			"label": "Qty From Option"
+		},
+		{
+			"default": "1",
+			"fieldname": "qty_multiplier",
+			"fieldtype": "Float",
+			"label": "Qty Multiplier"
+		},
+		{
+			"fieldname": "section_break_description",
+			"fieldtype": "Section Break",
+			"label": "Description"
+		},
+		{
+			"fieldname": "description_override",
+			"fieldtype": "Small Text",
+			"label": "Description Override"
+		},
+		{
+			"fieldname": "description_from_option",
+			"fieldtype": "Data",
+			"label": "Description From Option"
+		}
+	],
+	"index_web_pages_for_search": 0,
+	"istable": 1,
+	"links": [],
+	"modified": "2024-12-29 00:00:00.000000",
+	"modified_by": "Administrator",
+	"module": "ERPNext CPQ",
+	"name": "Configurator Item Rule",
+	"owner": "Administrator",
+	"permissions": [],
+	"sort_field": "modified",
+	"sort_order": "DESC",
+	"states": []
+}

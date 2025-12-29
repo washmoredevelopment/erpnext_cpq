@@ -1,0 +1,156 @@
+{
+	"actions": [],
+	"allow_rename": 1,
+	"autoname": "naming_series:",
+	"creation": "2024-12-29 00:00:00.000000",
+	"doctype": "DocType",
+	"editable_grid": 1,
+	"engine": "InnoDB",
+	"field_order": [
+		"naming_series",
+		"title",
+		"is_active",
+		"column_break_item",
+		"item",
+		"item_name",
+		"item_group",
+		"section_break_description",
+		"description",
+		"section_break_options",
+		"options",
+		"section_break_rules",
+		"item_rules"
+	],
+	"fields": [
+		{
+			"default": "CFG-.YYYY.-.#####",
+			"fieldname": "naming_series",
+			"fieldtype": "Select",
+			"label": "Series",
+			"options": "CFG-.YYYY.-.#####"
+		},
+		{
+			"fieldname": "title",
+			"fieldtype": "Data",
+			"in_list_view": 1,
+			"label": "Title",
+			"reqd": 1
+		},
+		{
+			"default": "1",
+			"fieldname": "is_active",
+			"fieldtype": "Check",
+			"label": "Is Active"
+		},
+		{
+			"fieldname": "column_break_item",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "item",
+			"fieldtype": "Link",
+			"in_list_view": 1,
+			"in_standard_filter": 1,
+			"label": "Parent Item",
+			"options": "Item",
+			"reqd": 1
+		},
+		{
+			"fetch_from": "item.item_name",
+			"fieldname": "item_name",
+			"fieldtype": "Data",
+			"label": "Item Name",
+			"read_only": 1
+		},
+		{
+			"fetch_from": "item.item_group",
+			"fieldname": "item_group",
+			"fieldtype": "Link",
+			"label": "Item Group",
+			"options": "Item Group",
+			"read_only": 1
+		},
+		{
+			"fieldname": "section_break_description",
+			"fieldtype": "Section Break",
+			"label": "Description"
+		},
+		{
+			"fieldname": "description",
+			"fieldtype": "Text Editor",
+			"label": "Description"
+		},
+		{
+			"fieldname": "section_break_options",
+			"fieldtype": "Section Break",
+			"label": "Configuration Options"
+		},
+		{
+			"fieldname": "options",
+			"fieldtype": "Table",
+			"label": "Options",
+			"options": "Configurator Option",
+			"reqd": 1
+		},
+		{
+			"fieldname": "section_break_rules",
+			"fieldtype": "Section Break",
+			"label": "Item Rules"
+		},
+		{
+			"fieldname": "item_rules",
+			"fieldtype": "Table",
+			"label": "Item Rules",
+			"options": "Configurator Item Rule",
+			"reqd": 1
+		}
+	],
+	"index_web_pages_for_search": 1,
+	"links": [],
+	"modified": "2024-12-29 00:00:00.000000",
+	"modified_by": "Administrator",
+	"module": "ERPNext CPQ",
+	"name": "Product Configurator",
+	"naming_rule": "By \"Naming Series\" field",
+	"owner": "Administrator",
+	"permissions": [
+		{
+			"create": 1,
+			"delete": 1,
+			"email": 1,
+			"export": 1,
+			"print": 1,
+			"read": 1,
+			"report": 1,
+			"role": "System Manager",
+			"share": 1,
+			"write": 1
+		},
+		{
+			"create": 1,
+			"delete": 1,
+			"email": 1,
+			"export": 1,
+			"print": 1,
+			"read": 1,
+			"report": 1,
+			"role": "Item Manager",
+			"share": 1,
+			"write": 1
+		},
+		{
+			"email": 1,
+			"export": 1,
+			"print": 1,
+			"read": 1,
+			"report": 1,
+			"role": "Sales User",
+			"share": 1
+		}
+	],
+	"sort_field": "modified",
+	"sort_order": "DESC",
+	"states": [],
+	"title_field": "title",
+	"track_changes": 1
+}

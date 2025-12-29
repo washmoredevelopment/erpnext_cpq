@@ -1,0 +1,126 @@
+{
+	"actions": [],
+	"creation": "2024-12-29 00:00:00.000000",
+	"doctype": "DocType",
+	"editable_grid": 1,
+	"engine": "InnoDB",
+	"field_order": [
+		"option_name",
+		"label",
+		"field_type",
+		"required",
+		"column_break_defaults",
+		"default_value",
+		"depends_on",
+		"depends_on_value",
+		"section_break_validation",
+		"min_value",
+		"max_value",
+		"column_break_help",
+		"help_text",
+		"section_break_choices",
+		"choices"
+	],
+	"fields": [
+		{
+			"fieldname": "option_name",
+			"fieldtype": "Data",
+			"in_list_view": 1,
+			"label": "Option Name",
+			"reqd": 1
+		},
+		{
+			"fieldname": "label",
+			"fieldtype": "Data",
+			"in_list_view": 1,
+			"label": "Display Label",
+			"reqd": 1
+		},
+		{
+			"default": "Select",
+			"fieldname": "field_type",
+			"fieldtype": "Select",
+			"in_list_view": 1,
+			"label": "Field Type",
+			"options": "Select\nInt\nFloat\nCheck\nData",
+			"reqd": 1
+		},
+		{
+			"default": "0",
+			"fieldname": "required",
+			"fieldtype": "Check",
+			"in_list_view": 1,
+			"label": "Required"
+		},
+		{
+			"fieldname": "column_break_defaults",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "default_value",
+			"fieldtype": "Data",
+			"label": "Default Value"
+		},
+		{
+			"description": "Option name this depends on (for conditional display)",
+			"fieldname": "depends_on",
+			"fieldtype": "Data",
+			"label": "Depends On"
+		},
+		{
+			"description": "Value that triggers display of this option",
+			"fieldname": "depends_on_value",
+			"fieldtype": "Data",
+			"label": "Show When Equals"
+		},
+		{
+			"depends_on": "eval:['Int', 'Float'].includes(doc.field_type)",
+			"fieldname": "section_break_validation",
+			"fieldtype": "Section Break",
+			"label": "Validation"
+		},
+		{
+			"fieldname": "min_value",
+			"fieldtype": "Float",
+			"label": "Minimum Value"
+		},
+		{
+			"fieldname": "max_value",
+			"fieldtype": "Float",
+			"label": "Maximum Value"
+		},
+		{
+			"fieldname": "column_break_help",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "help_text",
+			"fieldtype": "Small Text",
+			"label": "Help Text"
+		},
+		{
+			"depends_on": "eval:doc.field_type === 'Select'",
+			"fieldname": "section_break_choices",
+			"fieldtype": "Section Break",
+			"label": "Choices"
+		},
+		{
+			"fieldname": "choices",
+			"fieldtype": "Table",
+			"label": "Choices",
+			"options": "Option Choice"
+		}
+	],
+	"index_web_pages_for_search": 0,
+	"istable": 1,
+	"links": [],
+	"modified": "2024-12-29 00:00:00.000000",
+	"modified_by": "Administrator",
+	"module": "ERPNext CPQ",
+	"name": "Configurator Option",
+	"owner": "Administrator",
+	"permissions": [],
+	"sort_field": "modified",
+	"sort_order": "DESC",
+	"states": []
+}

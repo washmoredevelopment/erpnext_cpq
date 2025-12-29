@@ -1,0 +1,115 @@
+{
+	"actions": [],
+	"autoname": "hash",
+	"creation": "2024-12-29 00:00:00.000000",
+	"doctype": "DocType",
+	"editable_grid": 1,
+	"engine": "InnoDB",
+	"field_order": [
+		"configuration",
+		"configurator",
+		"column_break_totals",
+		"currency",
+		"total",
+		"section_break_items",
+		"items"
+	],
+	"fields": [
+		{
+			"fieldname": "configuration",
+			"fieldtype": "Link",
+			"in_list_view": 1,
+			"in_standard_filter": 1,
+			"label": "Configuration",
+			"options": "Product Configuration",
+			"reqd": 1
+		},
+		{
+			"fieldname": "configurator",
+			"fieldtype": "Link",
+			"in_list_view": 1,
+			"in_standard_filter": 1,
+			"label": "Configurator",
+			"options": "Product Configurator"
+		},
+		{
+			"fieldname": "column_break_totals",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "currency",
+			"fieldtype": "Link",
+			"label": "Currency",
+			"options": "Currency"
+		},
+		{
+			"fieldname": "total",
+			"fieldtype": "Currency",
+			"in_list_view": 1,
+			"label": "Total",
+			"options": "currency",
+			"read_only": 1
+		},
+		{
+			"fieldname": "section_break_items",
+			"fieldtype": "Section Break",
+			"label": "Items"
+		},
+		{
+			"fieldname": "items",
+			"fieldtype": "Table",
+			"label": "Items",
+			"options": "Configuration Result Item"
+		}
+	],
+	"index_web_pages_for_search": 0,
+	"links": [],
+	"modified": "2024-12-29 00:00:00.000000",
+	"modified_by": "Administrator",
+	"module": "ERPNext CPQ",
+	"name": "Configuration Result",
+	"naming_rule": "Random",
+	"owner": "Administrator",
+	"permissions": [
+		{
+			"create": 1,
+			"delete": 1,
+			"email": 1,
+			"export": 1,
+			"print": 1,
+			"read": 1,
+			"report": 1,
+			"role": "System Manager",
+			"share": 1,
+			"write": 1
+		},
+		{
+			"create": 1,
+			"delete": 1,
+			"email": 1,
+			"export": 1,
+			"print": 1,
+			"read": 1,
+			"report": 1,
+			"role": "Sales User",
+			"share": 1,
+			"write": 1
+		},
+		{
+			"create": 1,
+			"delete": 1,
+			"email": 1,
+			"export": 1,
+			"print": 1,
+			"read": 1,
+			"report": 1,
+			"role": "Sales Manager",
+			"share": 1,
+			"write": 1
+		}
+	],
+	"sort_field": "modified",
+	"sort_order": "DESC",
+	"states": [],
+	"track_changes": 1
+}

@@ -1,0 +1,123 @@
+{
+	"actions": [],
+	"autoname": "hash",
+	"creation": "2024-12-29 00:00:00.000000",
+	"doctype": "DocType",
+	"editable_grid": 1,
+	"engine": "InnoDB",
+	"field_order": [
+		"configurator",
+		"column_break_parent",
+		"parent_doctype",
+		"parent_name",
+		"parent_item_row",
+		"section_break_selections",
+		"selections",
+		"section_break_summary",
+		"configuration_summary"
+	],
+	"fields": [
+		{
+			"fieldname": "configurator",
+			"fieldtype": "Link",
+			"in_list_view": 1,
+			"in_standard_filter": 1,
+			"label": "Configurator",
+			"options": "Product Configurator",
+			"reqd": 1
+		},
+		{
+			"fieldname": "column_break_parent",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "parent_doctype",
+			"fieldtype": "Data",
+			"in_list_view": 1,
+			"label": "Parent DocType"
+		},
+		{
+			"fieldname": "parent_name",
+			"fieldtype": "Data",
+			"in_list_view": 1,
+			"label": "Parent Name"
+		},
+		{
+			"fieldname": "parent_item_row",
+			"fieldtype": "Data",
+			"label": "Parent Item Row"
+		},
+		{
+			"fieldname": "section_break_selections",
+			"fieldtype": "Section Break",
+			"label": "Selections"
+		},
+		{
+			"fieldname": "selections",
+			"fieldtype": "Table",
+			"label": "Selections",
+			"options": "Configuration Selection"
+		},
+		{
+			"fieldname": "section_break_summary",
+			"fieldtype": "Section Break",
+			"label": "Summary"
+		},
+		{
+			"fieldname": "configuration_summary",
+			"fieldtype": "Text",
+			"label": "Configuration Summary",
+			"read_only": 1
+		}
+	],
+	"index_web_pages_for_search": 0,
+	"links": [],
+	"modified": "2024-12-29 00:00:00.000000",
+	"modified_by": "Administrator",
+	"module": "ERPNext CPQ",
+	"name": "Product Configuration",
+	"naming_rule": "Random",
+	"owner": "Administrator",
+	"permissions": [
+		{
+			"create": 1,
+			"delete": 1,
+			"email": 1,
+			"export": 1,
+			"print": 1,
+			"read": 1,
+			"report": 1,
+			"role": "System Manager",
+			"share": 1,
+			"write": 1
+		},
+		{
+			"create": 1,
+			"delete": 1,
+			"email": 1,
+			"export": 1,
+			"print": 1,
+			"read": 1,
+			"report": 1,
+			"role": "Sales User",
+			"share": 1,
+			"write": 1
+		},
+		{
+			"create": 1,
+			"delete": 1,
+			"email": 1,
+			"export": 1,
+			"print": 1,
+			"read": 1,
+			"report": 1,
+			"role": "Sales Manager",
+			"share": 1,
+			"write": 1
+		}
+	],
+	"sort_field": "modified",
+	"sort_order": "DESC",
+	"states": [],
+	"track_changes": 1
+}

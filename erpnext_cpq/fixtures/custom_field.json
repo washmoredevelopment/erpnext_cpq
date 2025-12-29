@@ -1,0 +1,30 @@
+[
+	{
+		"doctype": "Custom Field",
+		"dt": "Item",
+		"fieldname": "cpq_section",
+		"fieldtype": "Section Break",
+		"insert_after": "variant_of",
+		"label": "Product Configuration"
+	},
+	{
+		"doctype": "Custom Field",
+		"dt": "Item",
+		"fieldname": "is_configurable",
+		"fieldtype": "Check",
+		"insert_after": "cpq_section",
+		"label": "Is Configurable",
+		"description": "When checked, this item requires configuration before selling"
+	},
+	{
+		"doctype": "Custom Field",
+		"dt": "Item",
+		"fieldname": "product_configurator",
+		"fieldtype": "Link",
+		"insert_after": "is_configurable",
+		"label": "Product Configurator",
+		"options": "Product Configurator",
+		"depends_on": "eval:doc.is_configurable",
+		"description": "The Super BOM that defines configuration options"
+	}
+]
