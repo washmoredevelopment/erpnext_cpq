@@ -584,15 +584,24 @@ def evaluate_configuration(
 	}
 	result_items = get_item_prices(result_items, pricing_args)
 
+	# Fetch max_discount for each item for weighted average calculation
+	for item_code, item_data in result_items.items():
+		max_discount = frappe.db.get_value("Item", item_code, "max_discount") or 0
+		item_data["max_discount"] = max_discount
+
 	# Create Configuration Result
 	result = frappe.new_doc("Configuration Result")
 	result.configuration = configuration_name
 	result.configurator = config.configurator
 	result.currency = currency
 
-	# Add items as child rows
+	# Add items as child rows and calculate weighted max discount
 	total = 0
+	weighted_discount_sum = 0
+	total_amount = 0
+
 	for item_code, item_data in result_items.items():
+		amount = item_data.get("amount", 0)
 		result.append(
 			"items",
 			{
@@ -602,14 +611,167 @@ def evaluate_configuration(
 				"qty": item_data.get("qty", 0),
 				"uom": item_data.get("uom", ""),
 				"rate": item_data.get("rate", 0),
-				"amount": item_data.get("amount", 0),
+				"amount": amount,
 			},
 		)
-		total += item_data.get("amount", 0)
+		total += amount
+
+		# Accumulate for weighted average max discount
+		max_discount = item_data.get("max_discount", 0)
+		weighted_discount_sum += amount * max_discount
+		total_amount += amount
 
 	# Set total
 	result.total = total
 
+	# Calculate weighted average max discount
+	if total_amount > 0:
+		result.max_discount = weighted_discount_sum / total_amount
+	else:
+		result.max_discount = 0
+
 	result.insert()
 
 	return result.name
+
+
+# =============================================================================
+# GET CONFIGURATION SELECTIONS API
+# =============================================================================
+
+
+@frappe.whitelist()
+def get_configuration_selections(configuration_name: str) -> dict:
+	"""
+	Load existing configuration selections for dialog pre-fill.
+
+	Args:
+	    configuration_name: Product Configuration name
+
+	Returns:
+	    dict: {option_name: value} mapping
+	"""
+	config = frappe.get_doc("Product Configuration", configuration_name)
+
+	selections = {}
+	for sel in config.selections:
+		val = sel.value
+
+		# Try to convert to appropriate type for dialog
+		if val == "1":
+			# Could be a checkbox - keep as string "1" for now
+			val = 1
+		elif val == "0":
+			val = 0
+		else:
+			try:
+				if "." in str(val):
+					val = float(val)
+				else:
+					val = int(val)
+			except (ValueError, TypeError):
+				pass
+
+		selections[sel.option_name] = val
+
+	return selections
+
+
+# =============================================================================
+# UPDATE CONFIGURATION API
+# =============================================================================
+
+
+@frappe.whitelist()
+def update_configuration(
+	configuration_name: str,
+	selections: dict | str,
+) -> dict:
+	"""
+	Update an existing Product Configuration with new selections.
+
+	Args:
+	    configuration_name: Product Configuration name
+	    selections: dict of {option_name: value} or JSON string
+
+	Returns:
+	    dict: {"name": config.name, "changes": [{"option": str, "from": str, "to": str}]}
+	"""
+	if isinstance(selections, str):
+		selections = json.loads(selections)
+
+	config = frappe.get_doc("Product Configuration", configuration_name)
+	configurator_doc = frappe.get_doc("Product Configurator", config.configurator)
+
+	# Capture old values for change tracking
+	old_selections = {}
+	for sel in config.selections:
+		old_selections[sel.option_name] = {
+			"value": sel.value,
+			"display_value": sel.display_value,
+		}
+
+	# Clear existing selections
+	config.selections = []
+
+	# Add new selections
+	changes = []
+	for option_name, value in selections.items():
+		option_label = _get_option_label(configurator_doc, option_name)
+		display_value = _get_display_value(configurator_doc, option_name, value)
+
+		# Normalize boolean values
+		if value is True:
+			stored_value = "1"
+		elif value is False:
+			stored_value = "0"
+		elif value is not None:
+			stored_value = str(value)
+		else:
+			stored_value = ""
+
+		config.append(
+			"selections",
+			{
+				"option_name": option_name,
+				"option_label": option_label,
+				"value": stored_value,
+				"display_value": display_value,
+			},
+		)
+
+		# Track changes
+		old_data = old_selections.get(option_name, {})
+		old_value = old_data.get("value", "")
+		old_display = old_data.get("display_value", old_value)
+
+		if str(stored_value) != str(old_value):
+			changes.append(
+				{
+					"option": option_label,
+					"from": old_display or old_value,
+					"to": display_value or stored_value,
+				}
+			)
+
+	# Check for removed options
+	for option_name, old_data in old_selections.items():
+		if option_name not in selections:
+			option_label = _get_option_label(configurator_doc, option_name)
+			changes.append(
+				{
+					"option": option_label,
+					"from": old_data.get("display_value") or old_data.get("value"),
+					"to": "(removed)",
+				}
+			)
+
+	# Rebuild configuration summary
+	config.configuration_summary = build_configuration_summary(config.selections, configurator_doc)
+
+	config.save()
+
+	return {
+		"name": config.name,
+		"changes": changes,
+	}
