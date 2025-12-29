@@ -335,14 +335,35 @@ def get_configurator_dialog_fields(configurator_name: str) -> list:
 			default_value = None
 			label_to_value_map = {}
 			choices = _get_option_choices(configurator, option.option_name)
+
+			# First pass: detect duplicate display texts
+			display_counts = {}
 			for choice in choices:
-				# Use label as the displayed option
 				display = choice.label or choice.value or ""
+				display_counts[display] = display_counts.get(display, 0) + 1
+
+			# Second pass: build options with disambiguation for duplicates
+			display_used = {}  # Track how many times each display text has been used
+			for choice in choices:
+				base_display = choice.label or choice.value or ""
+				value = choice.value or ""
+
+				# If this display text has duplicates, disambiguate by appending value
+				if display_counts.get(base_display, 0) > 1:
+					display = f"{base_display} ({value})" if value else base_display
+				else:
+					display = base_display
+
+				# Safety check: if still duplicate (e.g., empty label and value), append index
+				if display in label_to_value_map:
+					idx = display_used.get(display, 1)
+					display = f"{display} #{idx + 1}"
+					display_used[display] = idx + 1
+
 				options.append(display)
-				# Store mapping for value lookup
-				label_to_value_map[display] = choice.value or ""
+				label_to_value_map[display] = value
 				if choice.is_default:
-					default_value = display  # Default is also the label
+					default_value = display  # Default is also the display text
 			field["options"] = "\n".join(options)
 			if default_value and not field.get("default"):
 				field["default"] = default_value
@@ -576,14 +597,13 @@ def evaluate_configuration(
 		val = sel.value
 		field_type = field_types.get(sel.option_name)
 
-		# Handle boolean string values (legacy data stored as "True"/"False")
-		if val == "True":
-			val = 1
-		elif val == "False":
-			val = 0
-		elif field_type == "Check":
+		if field_type == "Check":
 			# Checkbox: convert to integer 1 or 0
-			val = 1 if val == "1" else 0
+			# Handle "1"/"0", "True"/"False", and boolean values
+			if val in ("True", "1", 1, True):
+				val = 1
+			else:
+				val = 0
 		elif field_type in ("Int", "Float"):
 			# Numeric fields: convert to number for comparisons
 			try:
@@ -693,14 +713,13 @@ def get_configuration_selections(configuration_name: str) -> dict:
 		val = sel.value
 		field_type = field_types.get(sel.option_name)
 
-		# Handle boolean string values (legacy data stored as "True"/"False")
-		if val == "True":
-			val = 1
-		elif val == "False":
-			val = 0
-		elif field_type == "Check":
+		if field_type == "Check":
 			# Checkbox: convert to integer 1 or 0
-			val = 1 if val == "1" else 0
+			# Handle "1"/"0", "True"/"False", and boolean values
+			if val in ("True", "1", 1, True):
+				val = 1
+			else:
+				val = 0
 		elif field_type in ("Int", "Float"):
 			# Numeric fields: convert to number
 			try:
