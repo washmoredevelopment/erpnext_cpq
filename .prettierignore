@@ -220,3 +220,4 @@ lib
 # In a Frappe context HTML files are either Jinja or Resig's microtemplate format and should not be checked
 *.html
 
+

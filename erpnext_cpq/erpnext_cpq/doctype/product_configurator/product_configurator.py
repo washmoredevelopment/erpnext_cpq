@@ -19,6 +19,9 @@ class ProductConfigurator(Document):
 		from erpnext_cpq.erpnext_cpq.doctype.configurator_option.configurator_option import (  # noqa: E501
 			ConfiguratorOption,
 		)
+		from erpnext_cpq.erpnext_cpq.doctype.option_choice.option_choice import (  # noqa: E501
+			OptionChoice,
+		)
 
 		description: DF.TextEditor | None
 		is_active: DF.Check
@@ -27,6 +30,7 @@ class ProductConfigurator(Document):
 		item_name: DF.Data | None
 		item_rules: DF.Table[ConfiguratorItemRule]
 		naming_series: DF.Literal["CFG-.YYYY.-.#####"]
+		option_choices: DF.Table[OptionChoice]
 		options: DF.Table[ConfiguratorOption]
 		title: DF.Data
 	# end: auto-generated types
