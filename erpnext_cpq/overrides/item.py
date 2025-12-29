@@ -53,9 +53,10 @@ def _validate_no_existing_pricing_rules(doc):
 			conflicting_rules.append(f"Pricing Rule: {rule.parent}")
 
 	# Check Promotional Schemes that target this item
+	# Promotional Scheme reuses "Pricing Rule Item Code" child table
 	promotional_items = frappe.get_all(
-		"Promotional Scheme Product Code",
-		filters={"item_code": doc.item_code},
+		"Pricing Rule Item Code",
+		filters={"item_code": doc.item_code, "parenttype": "Promotional Scheme"},
 		fields=["parent"],
 		distinct=True,
 	)
