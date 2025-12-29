@@ -116,7 +116,7 @@ def calculate_qty(rule, selections: dict) -> float:
 			base = float(selections.get(rule.qty_from_option) or 0)
 		except (ValueError, TypeError):
 			base = 0
-		multiplier = rule.qty_multiplier or 1
+		multiplier = 1 if rule.qty_multiplier is None else rule.qty_multiplier
 		return base * multiplier
 	else:
 		return rule.base_qty or 0
@@ -352,10 +352,10 @@ def build_configuration_summary(selections: list, configurator) -> str:
 		label = selection.option_label or selection.option_name
 		value = selection.display_value or selection.value
 
-		# For Check fields, show Yes/No
-		if value == "1" or value == 1 or value is True:
+		# For Check fields, show Yes/No (handle all boolean representations)
+		if value == "1" or value == 1 or value is True or value == "True":
 			value = "Yes"
-		elif value == "0" or value == 0 or value is False:
+		elif value == "0" or value == 0 or value is False or value == "False":
 			value = "No"
 
 		lines.append(f"• {label}: {value}")
@@ -449,12 +449,22 @@ def create_configuration(
 		option_label = _get_option_label(configurator_doc, option_name)
 		display_value = _get_display_value(configurator_doc, option_name, value)
 
+		# Normalize boolean values to "1"/"0" for consistent storage
+		if value is True:
+			stored_value = "1"
+		elif value is False:
+			stored_value = "0"
+		elif value is not None:
+			stored_value = str(value)
+		else:
+			stored_value = ""
+
 		config.append(
 			"selections",
 			{
 				"option_name": option_name,
 				"option_label": option_label,
-				"value": str(value) if value is not None else "",
+				"value": stored_value,
 				"display_value": display_value,
 			},
 		)
@@ -499,13 +509,20 @@ def evaluate_configuration(
 	for sel in config.selections:
 		# Try to convert to number if possible for numeric comparisons
 		val = sel.value
-		try:
-			if "." in str(val):
-				val = float(val)
-			else:
-				val = int(val)
-		except (ValueError, TypeError):
-			pass
+
+		# Handle boolean string values (legacy data stored as "True"/"False")
+		if val == "True":
+			val = 1
+		elif val == "False":
+			val = 0
+		else:
+			try:
+				if "." in str(val):
+					val = float(val)
+				else:
+					val = int(val)
+			except (ValueError, TypeError):
+				pass
 		selections[sel.option_name] = val
 
 	# Evaluate rules to get matched items
