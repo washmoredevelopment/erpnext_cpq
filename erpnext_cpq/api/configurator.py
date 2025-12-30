@@ -356,9 +356,11 @@ def get_configurator_dialog_fields(configurator_name: str) -> list:
 
 				# Safety check: if still duplicate (e.g., empty label and value), append index
 				if display in label_to_value_map:
-					idx = display_used.get(display, 1)
+					# Track by the original display key (before # suffix) to handle multiple duplicates correctly
+					original_display = display
+					idx = display_used.get(original_display, 0)
 					display = f"{display} #{idx + 1}"
-					display_used[display] = idx + 1
+					display_used[original_display] = idx + 1
 
 				options.append(display)
 				label_to_value_map[display] = value

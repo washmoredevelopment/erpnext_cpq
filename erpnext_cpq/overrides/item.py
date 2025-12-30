@@ -42,7 +42,7 @@ def _validate_no_existing_pricing_rules(doc):
 	# Check Pricing Rules that target this item
 	pricing_rules = frappe.get_all(
 		"Pricing Rule Item Code",
-		filters={"item_code": doc.item_code},
+		filters={"item_code": doc.item_code, "parenttype": "Pricing Rule"},
 		fields=["parent"],
 		distinct=True,
 	)
