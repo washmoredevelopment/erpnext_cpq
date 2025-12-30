@@ -15,157 +15,143 @@
 const CPQTransaction = {
 	// Cache for item configurability to avoid repeated DB lookups
 	_configurable_cache: {},
+	// MutationObserver for watching .link-btn elements
+	_observer: null,
 
 	/**
 	 * Initialize CPQ handlers for a transaction form
 	 * @param {Object} frm - Frappe form object
 	 */
 	init(frm) {
-		// Add inline button hover handlers to the items grid
-		this.setup_inline_buttons(frm)
+		// Inject CSS for inline button (only once)
+		this.inject_styles()
 		// Pre-cache configurability for all items
 		this.cache_configurable_items(frm)
+		// Setup MutationObserver to watch for .link-btn elements
+		this.setup_link_btn_observer(frm)
 	},
 
 	/**
-	 * Setup hover-based inline configure buttons
+	 * Inject CSS styles for the configure button
+	 */
+	inject_styles() {
+		if ($('#cpq-btn-style').length) return
+
+		$('head').append(`
+			<style id="cpq-btn-style">
+				.cpq-configure-btn {
+					padding: 2px 6px;
+					font-size: 10px;
+					background: var(--primary);
+					color: white !important;
+					border-radius: 3px;
+					cursor: pointer;
+					margin-right: 4px;
+					text-decoration: none !important;
+				}
+				.cpq-configure-btn:hover {
+					background: var(--primary);
+				}
+			</style>
+		`)
+	},
+
+	/**
+	 * Setup MutationObserver to watch for .link-btn elements appearing in the grid
+	 * This hooks into Frappe's Link field creation when a row enters edit mode
 	 * @param {Object} frm - Frappe form object
 	 */
-	setup_inline_buttons(frm) {
+	setup_link_btn_observer(frm) {
 		const grid = frm.fields_dict.items?.grid
 		if (!grid) return
 
-		const $wrapper = grid.wrapper
-
-		// Inject CSS for inline button (only once)
-		if (!$('#cpq-inline-btn-style').length) {
-			$('head').append(`
-				<style id="cpq-inline-btn-style">
-					.cpq-inline-configure-btn {
-						position: absolute;
-						right: 8px;
-						top: 50%;
-						transform: translateY(-50%);
-						padding: 2px 8px;
-						font-size: 11px;
-						background: var(--primary);
-						color: white;
-						border: none;
-						border-radius: 4px;
-						cursor: pointer;
-						z-index: 10;
-						opacity: 0;
-						transition: opacity 0.15s;
-					}
-					.cpq-inline-configure-btn:hover {
-						background: var(--primary-dark);
-					}
-					.grid-row:hover .cpq-inline-configure-btn {
-						opacity: 1;
-					}
-					.grid-row .item-code-cell {
-						position: relative;
-					}
-				</style>
-			`)
+		// Disconnect any existing observer
+		if (this._observer) {
+			this._observer.disconnect()
 		}
 
-		// Handle row rendering to inject buttons
-		$wrapper.off('mouseenter.cpq', '.grid-row').on('mouseenter.cpq', '.grid-row', e => {
-			const $row = $(e.currentTarget)
-			const row_idx = $row.data('idx')
-			if (!row_idx) return
+		// Watch for .link-btn elements appearing in the grid
+		this._observer = new MutationObserver(mutations => {
+			for (const mutation of mutations) {
+				for (const node of mutation.addedNodes) {
+					if (node.nodeType !== Node.ELEMENT_NODE) continue
 
-			const item = (frm.doc.items || []).find(i => i.idx === row_idx)
-			if (!item || !item.item_code) return
+					// Check if this is a link-btn or contains one
+					const $node = $(node)
+					const $linkBtns = $node.is('.link-btn') ? $node : $node.find('.link-btn')
 
-			// Check cache for configurability
-			this.check_and_inject_button(frm, item, $row)
+					$linkBtns.each((_, el) => {
+						this.maybe_inject_configure_button(frm, $(el))
+					})
+				}
+			}
 		})
 
-		// Clean up buttons on mouse leave
-		// Check relatedTarget to avoid removing button when moving to it
-		$wrapper.off('mouseleave.cpq', '.grid-row').on('mouseleave.cpq', '.grid-row', e => {
-			const $row = $(e.currentTarget)
-			const $relatedTarget = $(e.relatedTarget)
-
-			// Don't remove if moving to the button or its children
-			if ($relatedTarget.closest('.cpq-inline-configure-btn').length) {
-				return
-			}
-			// Don't remove if moving to a child of this row
-			if ($relatedTarget.closest($row).length) {
-				return
-			}
-
-			$row.find('.cpq-inline-configure-btn').remove()
+		// Observe the grid body for DOM changes
+		this._observer.observe(grid.wrapper[0], {
+			childList: true,
+			subtree: true,
 		})
 	},
 
 	/**
-	 * Check if item is configurable and inject button
+	 * Check if the .link-btn is for item_code and if the item is configurable
+	 * @param {Object} frm - Frappe form object
+	 * @param {jQuery} $link_btn - The .link-btn jQuery element
 	 */
-	check_and_inject_button(frm, item, $row) {
-		const item_code = item.item_code
-		const cached = this._configurable_cache[item_code]
+	maybe_inject_configure_button(frm, $link_btn) {
+		// Find the parent cell and check if this is for item_code
+		const $cell = $link_btn.closest('[data-fieldname="item_code"]')
+		if (!$cell.length) return
 
-		if (cached === undefined) {
-			// Not in cache yet - fetch and cache
-			frappe.db.get_value('Item', item_code, ['is_configurable', 'product_configurator']).then(r => {
-				if (r.message && r.message.is_configurable) {
-					this._configurable_cache[item_code] = r.message.product_configurator
-					item._is_configurable = true
+		const $row = $link_btn.closest('.grid-row')
+		const row_idx = $row.data('idx')
+		if (!row_idx) return
+
+		const item = (frm.doc.items || []).find(i => i.idx === row_idx)
+		if (!item?.item_code) return
+
+		// Check configurability and add button
+		const cached = this._configurable_cache[item.item_code]
+		if (cached) {
+			item._product_configurator = cached
+			this.add_configure_button_to_link_btn(frm, item, $link_btn)
+		} else if (cached === undefined) {
+			// Fetch and cache if not yet known
+			frappe.db.get_value('Item', item.item_code, ['is_configurable', 'product_configurator']).then(r => {
+				if (r.message?.is_configurable) {
+					this._configurable_cache[item.item_code] = r.message.product_configurator
 					item._product_configurator = r.message.product_configurator
-					this.inject_configure_button(frm, item, $row)
+					this.add_configure_button_to_link_btn(frm, item, $link_btn)
 				} else {
-					this._configurable_cache[item_code] = false
-					item._is_configurable = false
+					this._configurable_cache[item.item_code] = false
 				}
 			})
-		} else if (cached) {
-			item._is_configurable = true
-			item._product_configurator = cached
-			this.inject_configure_button(frm, item, $row)
 		}
 	},
 
 	/**
-	 * Inject the configure button into the item_code cell
+	 * Add the configure button to a .link-btn span
+	 * @param {Object} frm - Frappe form object
+	 * @param {Object} item - The item row doc
+	 * @param {jQuery} $link_btn - The .link-btn jQuery element
 	 */
-	inject_configure_button(frm, item, $row) {
-		// Find the item_code cell
-		const $item_code_cell = $row.find('[data-fieldname="item_code"]')
-		if (!$item_code_cell.length) return
-
+	add_configure_button_to_link_btn(frm, item, $link_btn) {
 		// Don't add duplicate buttons
-		if ($item_code_cell.find('.cpq-inline-configure-btn').length) return
+		if ($link_btn.find('.cpq-configure-btn').length) return
 
-		// Make cell relative for absolute positioning
-		$item_code_cell.css('position', 'relative')
-
-		// Create and inject button
+		// Create button
 		const btn_text = item.product_configuration ? __('Reconfigure') : __('Configure')
-		const $btn = $(`<button class="cpq-inline-configure-btn">${btn_text}</button>`)
+		const $btn = $(`<a class="cpq-configure-btn" title="${btn_text}">${btn_text}</a>`)
 
 		$btn.on('click', e => {
 			e.stopPropagation()
 			e.preventDefault()
-			const cdt = item.doctype
-			const cdn = item.name
-			// Use on_configure_click to ensure document is saved before opening dialog
-			this.on_configure_click(frm, cdt, cdn)
+			this.on_configure_click(frm, item.doctype, item.name)
 		})
 
-		// Remove button when leaving it to outside the row
-		$btn.on('mouseleave', e => {
-			const $relatedTarget = $(e.relatedTarget)
-			// Only remove if not moving back into the row
-			if (!$relatedTarget.closest($row).length) {
-				$btn.remove()
-			}
-		})
-
-		$item_code_cell.append($btn)
+		// Prepend as first element in the link-btn span
+		$link_btn.prepend($btn)
 	},
 
 	/**
@@ -603,6 +589,15 @@ function setup_cpq_handlers(doctype, item_doctype) {
 	frappe.ui.form.on(doctype, {
 		refresh(frm) {
 			CPQTransaction.init(frm)
+		},
+		onload(frm) {
+			// Cleanup observer when navigating away
+			$(window).on('beforeunload.cpq', () => {
+				if (CPQTransaction._observer) {
+					CPQTransaction._observer.disconnect()
+					CPQTransaction._observer = null
+				}
+			})
 		},
 	})
 
