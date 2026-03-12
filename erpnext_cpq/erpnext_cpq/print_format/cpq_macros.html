@@ -1,0 +1,59 @@
+{#- CPQ Print Format Macros - Reusable across all transaction print formats -#}
+
+{%- macro render_items_table(doc) -%}
+<table class="table table-bordered table-condensed" style="margin-top: 20px;">
+	<thead>
+		<tr>
+			<th style="width: 5%;">#</th>
+			<th style="width: 35%;">{{ _("Item") }}</th>
+			<th class="text-right" style="width: 10%;">{{ _("Qty") }}</th>
+			<th style="width: 10%;">{{ _("UOM") }}</th>
+			<th class="text-right" style="width: 20%;">{{ _("Rate") }}</th>
+			<th class="text-right" style="width: 20%;">{{ _("Amount") }}</th>
+		</tr>
+	</thead>
+	<tbody>
+		{%- for item in doc.items -%}
+		{%- set is_configured = is_configured_item(item) -%}
+		<tr{% if is_configured %} style="font-weight: bold;"{% endif %}>
+			<td>{{ item.idx }}</td>
+			<td>
+				{{ item.item_name or item.item_code }}
+				{%- if item.description and not is_configured %}
+				<br><small class="text-muted">{{ item.description }}</small>
+				{%- endif -%}
+			</td>
+			<td class="text-right">{{ item.qty }}</td>
+			<td>{{ item.uom or item.stock_uom or "" }}</td>
+			<td class="text-right">{{ frappe.format(item.rate, {"fieldtype": "Currency", "options": doc.currency}) }}</td>
+			<td class="text-right">{{ frappe.format(item.amount, {"fieldtype": "Currency", "options": doc.currency}) }}</td>
+		</tr>
+		{%- if is_configured -%}
+		{%- set components = get_configuration_breakdown(item) -%}
+		{%- for comp in components -%}
+		<tr style="color: #6c757d; font-size: 0.9em;">
+			<td></td>
+			<td style="padding-left: 25px;">
+				&#8627; {{ comp.item_name or comp.item_code }}
+				{%- if comp.description %}
+				<br><small>{{ comp.description }}</small>
+				{%- endif -%}
+			</td>
+			<td class="text-right">{{ comp.qty }}</td>
+			<td>{{ comp.uom or "" }}</td>
+			<td class="text-right">{{ frappe.format(comp.rate, {"fieldtype": "Currency", "options": doc.currency}) }}</td>
+			<td class="text-right">{{ frappe.format(comp.amount, {"fieldtype": "Currency", "options": doc.currency}) }}</td>
+		</tr>
+		{%- endfor -%}
+		{%- set summary = get_configuration_summary(item) -%}
+		{%- if summary -%}
+		<tr style="color: #6c757d; font-size: 0.85em;">
+			<td></td>
+			<td colspan="5" style="padding-left: 25px; white-space: pre-line;">{{ summary }}</td>
+		</tr>
+		{%- endif -%}
+		{%- endif -%}
+		{%- endfor -%}
+	</tbody>
+</table>
+{%- endmacro -%}

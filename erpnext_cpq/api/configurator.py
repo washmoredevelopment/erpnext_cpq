@@ -27,6 +27,49 @@ def _get_option_choices(configurator, option_name: str) -> list:
 	return [c for c in configurator.option_choices if c.option_name == option_name]
 
 
+def _parse_selections(config, configurator_doc) -> dict:
+	"""
+	Convert a Product Configuration's selections table to a properly-typed dict.
+
+	Args:
+	    config: Product Configuration document
+	    configurator_doc: Product Configurator document
+
+	Returns:
+	    dict: {option_name: typed_value}
+	"""
+	field_types = {}
+	for option in configurator_doc.options:
+		field_types[option.option_name] = option.field_type
+
+	selections = {}
+	for sel in config.selections:
+		val = sel.value
+		field_type = field_types.get(sel.option_name)
+
+		if field_type == "Check":
+			# Checkbox: convert to integer 1 or 0
+			# Handle "1"/"0", "True"/"False", and boolean values
+			if val in ("True", "1", 1, True):
+				val = 1
+			else:
+				val = 0
+		elif field_type in ("Int", "Float"):
+			# Numeric fields: convert to number for comparisons
+			try:
+				if field_type == "Float" or "." in str(val):
+					val = float(val)
+				else:
+					val = int(val)
+			except (ValueError, TypeError):
+				val = 0
+		# For Select, Data, and other types: keep as string for rule matching
+
+		selections[sel.option_name] = val
+
+	return selections
+
+
 # =============================================================================
 # RULE MATCHING
 # =============================================================================
@@ -235,7 +278,8 @@ def get_item_prices(items: dict, args: dict) -> dict:
 
 	Args:
 	    items: dict from evaluate_rules {item_code: {...}}
-	    args: dict with price_list, customer, company, doctype, currency
+	    args: dict with price_list, customer, company, doctype, currency,
+	          transaction_date/posting_date, name
 
 	Returns:
 	    dict: Same structure with rate and amount added to each item
@@ -245,27 +289,46 @@ def get_item_prices(items: dict, args: dict) -> dict:
 	price_list = args.get("price_list")
 	customer = args.get("customer")
 	company = args.get("company")
-	doctype = args.get("doctype", "Quotation")
+	parent_doctype = args.get("doctype", "Quotation")
 	currency = args.get("currency")
 
 	# Get currency from price list if not provided
 	if not currency and price_list:
 		currency = frappe.db.get_value("Price List", price_list, "currency")
 
+	# Map parent doctype to child item doctype
+	child_doctype_map = {
+		"Quotation": "Quotation Item",
+		"Sales Order": "Sales Order Item",
+		"Sales Invoice": "Sales Invoice Item",
+		"Delivery Note": "Delivery Note Item",
+	}
+	child_doctype = child_doctype_map.get(parent_doctype, "Quotation Item")
+
+	# Build date field appropriate for the transaction type
+	date_field_args = {}
+	if parent_doctype in ("Sales Invoice", "Delivery Note"):
+		date_field_args["posting_date"] = args.get("posting_date") or args.get("transaction_date") or frappe.utils.nowdate()
+	else:
+		date_field_args["transaction_date"] = args.get("transaction_date") or frappe.utils.nowdate()
+
 	for item_code, item_data in items.items():
 		try:
-			item_details = get_item_details(
-				{
-					"item_code": item_code,
-					"price_list": price_list,
-					"customer": customer,
-					"company": company,
-					"qty": item_data["qty"],
-					"doctype": doctype,
-					"conversion_rate": 1,
-					"plc_conversion_rate": 1,
-				}
-			)
+			detail_args = {
+				"item_code": item_code,
+				"price_list": price_list,
+				"customer": customer,
+				"company": company,
+				"qty": item_data["qty"],
+				"doctype": child_doctype,
+				"parenttype": parent_doctype,
+				"name": args.get("name"),
+				"conversion_rate": 1,
+				"plc_conversion_rate": 1,
+			}
+			detail_args.update(date_field_args)
+
+			item_details = get_item_details(detail_args)
 			rate = item_details.get("price_list_rate") or 0
 		except Exception as e:
 			frappe.log_error(
@@ -501,7 +564,7 @@ def create_configuration(
 	parent_doctype: str = None,
 	parent_name: str = None,
 	parent_item_row: str = None,
-) -> str:
+) -> dict:
 	"""
 	Create a Product Configuration from user selections.
 
@@ -513,7 +576,7 @@ def create_configuration(
 	    parent_item_row: The items table row name
 
 	Returns:
-	    str: Product Configuration name
+	    dict: {"name": config name, "configuration_summary": summary text}
 	"""
 	if isinstance(selections, str):
 		selections = json.loads(selections)
@@ -557,7 +620,10 @@ def create_configuration(
 
 	config.insert()
 
-	return config.name
+	return {
+		"name": config.name,
+		"configuration_summary": config.configuration_summary,
+	}
 
 
 # =============================================================================
@@ -571,7 +637,7 @@ def evaluate_configuration(
 	price_list: str,
 	customer: str = None,
 	company: str = None,
-) -> str:
+) -> dict:
 	"""
 	Evaluate a configuration and create a priced Configuration Result.
 
@@ -582,42 +648,15 @@ def evaluate_configuration(
 	    company: Company name
 
 	Returns:
-	    str: Configuration Result name
+	    dict: {"name": result name, "total": float, "max_discount": float,
+	           "configuration_summary": str}
 	"""
 	# Load configuration
 	config = frappe.get_doc("Product Configuration", configuration_name)
 	configurator_doc = frappe.get_doc("Product Configurator", config.configurator)
 
-	# Build a map of option field types for proper conversion
-	field_types = {}
-	for option in configurator_doc.options:
-		field_types[option.option_name] = option.field_type
-
-	# Convert selections table to dict
-	selections = {}
-	for sel in config.selections:
-		val = sel.value
-		field_type = field_types.get(sel.option_name)
-
-		if field_type == "Check":
-			# Checkbox: convert to integer 1 or 0
-			# Handle "1"/"0", "True"/"False", and boolean values
-			if val in ("True", "1", 1, True):
-				val = 1
-			else:
-				val = 0
-		elif field_type in ("Int", "Float"):
-			# Numeric fields: convert to number for comparisons
-			try:
-				if field_type == "Float" or "." in str(val):
-					val = float(val)
-				else:
-					val = int(val)
-			except (ValueError, TypeError):
-				val = 0
-		# For Select, Data, and other types: keep as string for rule matching
-
-		selections[sel.option_name] = val
+	# Convert selections table to dict using shared helper
+	selections = _parse_selections(config, configurator_doc)
 
 	# Evaluate rules to get matched items
 	result_items = evaluate_rules(config.configurator, selections)
@@ -639,6 +678,15 @@ def evaluate_configuration(
 	for item_code, item_data in result_items.items():
 		max_discount = frappe.db.get_value("Item", item_code, "max_discount") or 0
 		item_data["max_discount"] = max_discount
+
+	# Delete any existing Configuration Result for this configuration
+	existing_results = frappe.get_all(
+		"Configuration Result",
+		filters={"configuration": configuration_name},
+		pluck="name",
+	)
+	for old_result in existing_results:
+		frappe.delete_doc("Configuration Result", old_result, force=True)
 
 	# Create Configuration Result
 	result = frappe.new_doc("Configuration Result")
@@ -683,7 +731,12 @@ def evaluate_configuration(
 
 	result.insert()
 
-	return result.name
+	return {
+		"name": result.name,
+		"total": result.total,
+		"max_discount": result.max_discount,
+		"configuration_summary": config.configuration_summary,
+	}
 
 
 # =============================================================================
@@ -705,37 +758,7 @@ def get_configuration_selections(configuration_name: str) -> dict:
 	config = frappe.get_doc("Product Configuration", configuration_name)
 	configurator_doc = frappe.get_doc("Product Configurator", config.configurator)
 
-	# Build a map of option field types for proper conversion
-	field_types = {}
-	for option in configurator_doc.options:
-		field_types[option.option_name] = option.field_type
-
-	selections = {}
-	for sel in config.selections:
-		val = sel.value
-		field_type = field_types.get(sel.option_name)
-
-		if field_type == "Check":
-			# Checkbox: convert to integer 1 or 0
-			# Handle "1"/"0", "True"/"False", and boolean values
-			if val in ("True", "1", 1, True):
-				val = 1
-			else:
-				val = 0
-		elif field_type in ("Int", "Float"):
-			# Numeric fields: convert to number
-			try:
-				if field_type == "Float" or "." in str(val):
-					val = float(val)
-				else:
-					val = int(val)
-			except (ValueError, TypeError):
-				val = 0
-		# For Select, Data, and other types: keep as string
-
-		selections[sel.option_name] = val
-
-	return selections
+	return _parse_selections(config, configurator_doc)
 
 
 # =============================================================================
@@ -836,3 +859,94 @@ def update_configuration(
 		"name": config.name,
 		"changes": changes,
 	}
+
+
+# =============================================================================
+# CONFIGURATION TEMPLATE APIs
+# =============================================================================
+
+
+@frappe.whitelist()
+def get_templates(configurator_name: str) -> list:
+	"""
+	Get all templates for a given Product Configurator.
+
+	Args:
+		configurator_name: Product Configurator name
+
+	Returns:
+		list of template dicts with selections
+	"""
+	templates = frappe.get_all(
+		"Configuration Template",
+		filters={"configurator": configurator_name},
+		fields=["name", "template_name", "is_default", "description"],
+		order_by="is_default desc, template_name asc",
+	)
+
+	for template in templates:
+		template["selections"] = frappe.get_all(
+			"Configuration Template Selection",
+			filters={"parent": template["name"]},
+			fields=["option_name", "value", "display_value"],
+			order_by="idx",
+		)
+
+	return templates
+
+
+@frappe.whitelist()
+def save_as_template(
+	configurator_name: str,
+	template_name: str,
+	selections: dict | str,
+) -> dict:
+	"""
+	Save current configuration selections as a reusable template.
+
+	Args:
+		configurator_name: Product Configurator name
+		template_name: Name for the template
+		selections: dict of {option_name: value} or JSON string
+
+	Returns:
+		dict with template name
+	"""
+	if isinstance(selections, str):
+		selections = json.loads(selections)
+
+	if not selections:
+		frappe.throw("Cannot save an empty configuration as a template.")
+
+	if not template_name or not template_name.strip():
+		frappe.throw("Template name is required.")
+
+	template_name = template_name.strip()
+
+	configurator_doc = frappe.get_doc("Product Configurator", configurator_name)
+
+	template = frappe.new_doc("Configuration Template")
+	template.template_name = template_name
+	template.configurator = configurator_name
+
+	for option_name, value in selections.items():
+		display_value = _get_display_value(configurator_doc, option_name, value)
+
+		if value is True:
+			stored_value = "1"
+		elif value is False:
+			stored_value = "0"
+		elif value is not None:
+			stored_value = str(value)
+		else:
+			stored_value = ""
+
+		template.append("selections", {
+			"option_name": option_name,
+			"value": stored_value,
+			"display_value": display_value,
+		})
+
+	template.insert()
+
+	return {"name": template.name, "template_name": template.template_name}

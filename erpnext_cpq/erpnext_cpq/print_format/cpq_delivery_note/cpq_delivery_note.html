@@ -1,0 +1,36 @@
+{%- from "erpnext_cpq/print_format/cpq_macros.html" import render_items_table -%}
+
+<div class="page-break">
+	<div id="header-html" class="hidden-pdf">
+		<div class="letter-head text-center">
+			<div class="letter-head-header">{{ doc.company }}</div>
+		</div>
+	</div>
+
+	<h2 class="text-center">{{ _("Delivery Note") }}</h2>
+
+	<div class="row section-break">
+		<div class="col-xs-6 column-break">
+			<div><strong>{{ _("Customer") }}:</strong> {{ doc.customer_name or doc.customer or "" }}</div>
+			{% if doc.shipping_address %}
+			<div>{{ frappe.get_doc("Address", doc.shipping_address_name).get_display() if doc.shipping_address_name else "" }}</div>
+			{% endif %}
+		</div>
+		<div class="col-xs-6 column-break text-right">
+			<div><strong>{{ _("Delivery Note") }}:</strong> {{ doc.name }}</div>
+			<div><strong>{{ _("Date") }}:</strong> {{ frappe.format(doc.posting_date, {"fieldtype": "Date"}) }}</div>
+			{% if doc.po_no %}
+			<div><strong>{{ _("PO No") }}:</strong> {{ doc.po_no }}</div>
+			{% endif %}
+		</div>
+	</div>
+
+	{{ render_items_table(doc) }}
+
+	{% if doc.terms %}
+	<div class="section-break" style="margin-top: 20px;">
+		<strong>{{ _("Terms and Conditions") }}</strong>
+		<div>{{ doc.terms }}</div>
+	</div>
+	{% endif %}
+</div>

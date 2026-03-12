@@ -11,7 +11,7 @@ app_license = "agpl-3.0"
 # Apps
 # ------------------
 
-# required_apps = []
+required_apps = ["frappe", "erpnext"]
 
 # Each item in the list will be shown as an app in the apps page
 # add_to_apps_screen = [
@@ -48,9 +48,11 @@ app_license = "agpl-3.0"
 # include js in doctype views
 doctype_js = {
 	"Product Configurator": "erpnext_cpq/doctype/product_configurator/product_configurator.js",
+	"Configuration Result": "erpnext_cpq/doctype/configuration_result/configuration_result.js",
 	"Quotation": "public/js/cpq_transaction.js",
 	"Sales Order": "public/js/cpq_transaction.js",
 	"Sales Invoice": "public/js/cpq_transaction.js",
+	"Delivery Note": "public/js/cpq_transaction.js",
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
@@ -82,10 +84,13 @@ doctype_js = {
 # ----------
 
 # add methods and filters to jinja environment
-# jinja = {
-# 	"methods": "erpnext_cpq.utils.jinja_methods",
-# 	"filters": "erpnext_cpq.utils.jinja_filters"
-# }
+jinja = {
+	"methods": [
+		"erpnext_cpq.utils.jinja.get_configuration_breakdown",
+		"erpnext_cpq.utils.jinja.is_configured_item",
+		"erpnext_cpq.utils.jinja.get_configuration_summary",
+	],
+}
 
 # Installation
 # ------------
@@ -150,13 +155,36 @@ doc_events = {
 		"validate": "erpnext_cpq.overrides.item.validate_item_configuration"
 	},
 	"Quotation": {
-		"validate": "erpnext_cpq.overrides.transaction.validate_configurable_items"
+		"validate": [
+			"erpnext_cpq.overrides.transaction.validate_configurable_items",
+			"erpnext_cpq.overrides.packed_items.populate_cpq_packed_items",
+		],
+		"on_update": "erpnext_cpq.overrides.conversion.update_configuration_parents",
+		"on_trash": "erpnext_cpq.overrides.conversion.cleanup_configurations",
 	},
 	"Sales Order": {
-		"validate": "erpnext_cpq.overrides.transaction.validate_configurable_items"
+		"validate": [
+			"erpnext_cpq.overrides.transaction.validate_configurable_items",
+			"erpnext_cpq.overrides.packed_items.populate_cpq_packed_items",
+		],
+		"on_update": "erpnext_cpq.overrides.conversion.update_configuration_parents",
+		"on_trash": "erpnext_cpq.overrides.conversion.cleanup_configurations",
 	},
 	"Sales Invoice": {
-		"validate": "erpnext_cpq.overrides.transaction.validate_configurable_items"
+		"validate": [
+			"erpnext_cpq.overrides.transaction.validate_configurable_items",
+			"erpnext_cpq.overrides.packed_items.populate_cpq_packed_items",
+		],
+		"on_update": "erpnext_cpq.overrides.conversion.update_configuration_parents",
+		"on_trash": "erpnext_cpq.overrides.conversion.cleanup_configurations",
+	},
+	"Delivery Note": {
+		"validate": [
+			"erpnext_cpq.overrides.transaction.validate_configurable_items",
+			"erpnext_cpq.overrides.packed_items.populate_cpq_packed_items",
+		],
+		"on_update": "erpnext_cpq.overrides.conversion.update_configuration_parents",
+		"on_trash": "erpnext_cpq.overrides.conversion.cleanup_configurations",
 	},
 	"Pricing Rule": {
 		"validate": "erpnext_cpq.overrides.pricing_rule.validate_pricing_rule"
@@ -208,7 +236,7 @@ doc_events = {
 
 # exempt linked doctypes from being automatically cancelled
 #
-# auto_cancel_exempted_doctypes = ["Auto Repeat"]
+auto_cancel_exempted_doctypes = ["Product Configuration", "Configuration Result"]
 
 # Ignore links to specified DocTypes when deleting documents
 # -----------------------------------------------------------

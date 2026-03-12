@@ -15,25 +15,39 @@ def validate_configurable_items(doc, method):
 	if not doc.get("items"):
 		return
 
+	# Batch fetch is_configurable for all item codes in one query
+	item_codes = list({item.item_code for item in doc.items if item.item_code})
+	if not item_codes:
+		return
+
+	configurable_items = set(
+		frappe.get_all(
+			"Item",
+			filters={"name": ("in", item_codes), "is_configurable": 1},
+			pluck="name",
+		)
+	)
+
 	for item in doc.items:
 		# Skip if no item_code
 		if not item.item_code:
 			continue
 
 		# Check if this item is configurable
-		is_configurable = frappe.db.get_value("Item", item.item_code, "is_configurable")
-
-		if not is_configurable:
+		if item.item_code not in configurable_items:
 			continue
 
 		# Configurable item must have a product_configuration linked
+		# Only hard-block on submission; drafts are allowed without configuration
 		if not item.get("product_configuration"):
-			frappe.throw(
-				_(
-					"Please configure item '{0}' (Row {1}) before saving. "
-					"Click the Configure button to set up the configuration."
-				).format(item.item_code, item.idx)
-			)
+			if doc.docstatus == 1:
+				frappe.throw(
+					_(
+						"Please configure item '{0}' (Row {1}) before submitting. "
+						"Click the Configure button to set up the configuration."
+					).format(item.item_code, item.idx)
+				)
+			continue
 
 		# If configuration_result exists, validate max discount
 		if item.get("configuration_result"):
@@ -45,18 +59,22 @@ def _validate_max_discount(doc, item):
 	Validate that the effective discount on a configured item doesn't exceed
 	the weighted average max discount from the Configuration Result.
 	"""
-	# Get max_discount from Configuration Result
-	max_discount = frappe.db.get_value(
-		"Configuration Result", item.configuration_result, "max_discount"
+	# Get max_discount and total from Configuration Result in one call
+	result_data = frappe.db.get_value(
+		"Configuration Result", item.configuration_result, ["max_discount", "total"], as_dict=True
 	)
 
+	if not result_data:
+		return
+
+	max_discount = result_data.max_discount
 	if max_discount is None:
 		# No max discount set - skip validation
 		return
 
 	# Calculate effective discount on this line item
 	# Compare the configuration total (original rate) vs current rate
-	config_total = frappe.db.get_value("Configuration Result", item.configuration_result, "total")
+	config_total = result_data.total
 
 	if not config_total or config_total <= 0:
 		return

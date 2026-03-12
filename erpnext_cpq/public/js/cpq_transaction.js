@@ -17,18 +17,37 @@ const CPQTransaction = {
 	_configurable_cache: {},
 	// MutationObserver for watching .link-btn elements
 	_observer: null,
+	// Reference to the current form for cleanup
+	_current_frm: null,
 
 	/**
 	 * Initialize CPQ handlers for a transaction form
 	 * @param {Object} frm - Frappe form object
 	 */
 	init(frm) {
+		// Clear cache on each init to avoid stale values across navigations
+		this._configurable_cache = {}
+		this._current_frm = frm
+
 		// Inject CSS for inline button (only once)
 		this.inject_styles()
 		// Pre-cache configurability for all items
 		this.cache_configurable_items(frm)
 		// Setup MutationObserver to watch for .link-btn elements
 		this.setup_link_btn_observer(frm)
+		// Add visual indicators after a short delay to allow grid to render
+		setTimeout(() => this.add_row_indicators(frm), 500)
+	},
+
+	/**
+	 * Clean up observers and caches when navigating away
+	 */
+	cleanup() {
+		if (this._observer) {
+			this._observer.disconnect()
+			this._observer = null
+		}
+		this._current_frm = null
 	},
 
 	/**
@@ -68,6 +87,7 @@ const CPQTransaction = {
 		// Disconnect any existing observer
 		if (this._observer) {
 			this._observer.disconnect()
+			this._observer = null
 		}
 
 		// Watch for .link-btn elements appearing in the grid
@@ -131,6 +151,19 @@ const CPQTransaction = {
 	},
 
 	/**
+	 * Get the appropriate button text for a given item
+	 * @param {Object} frm - Frappe form object
+	 * @param {Object} item - The item row doc
+	 * @returns {string} The button text
+	 */
+	get_button_text(frm, item) {
+		if (frm.doc.docstatus === 1) {
+			return __('View Configuration')
+		}
+		return item.product_configuration ? __('Reconfigure') : __('Configure')
+	},
+
+	/**
 	 * Add the configure button to a .link-btn span
 	 * @param {Object} frm - Frappe form object
 	 * @param {Object} item - The item row doc
@@ -140,8 +173,8 @@ const CPQTransaction = {
 		// Don't add duplicate buttons
 		if ($link_btn.find('.cpq-configure-btn').length) return
 
-		// Create button
-		const btn_text = item.product_configuration ? __('Reconfigure') : __('Configure')
+		// Create configure button
+		const btn_text = this.get_button_text(frm, item)
 		const $btn = $(`<a class="cpq-configure-btn" title="${btn_text}">${btn_text}</a>`)
 
 		$btn.on('click', e => {
@@ -152,6 +185,38 @@ const CPQTransaction = {
 
 		// Prepend as first element in the link-btn span
 		$link_btn.prepend($btn)
+
+		// Add breakdown button after configure button if configuration exists
+		if (item.configuration_result) {
+			const $breakdown_btn = $(
+				`<a class="cpq-configure-btn" title="${__('View Breakdown')}" style="background: var(--text-muted);">${__('Breakdown')}</a>`
+			)
+			$breakdown_btn.on('click', e => {
+				e.stopPropagation()
+				e.preventDefault()
+				this.show_breakdown_dialog(frm, item.doctype, item.name)
+			})
+			$btn.after($breakdown_btn)
+		}
+	},
+
+	/**
+	 * Update the configure button text for a specific item row
+	 * @param {Object} frm - Frappe form object
+	 * @param {Object} item - The item row doc
+	 */
+	update_configure_button_text(frm, item) {
+		const $grid = frm.fields_dict.items?.grid?.wrapper
+		if (!$grid) return
+
+		const $row = $grid.find(`.grid-row[data-idx="${item.idx}"]`)
+		if (!$row.length) return
+
+		const $btn = $row.find('[data-fieldname="item_code"] .link-btn .cpq-configure-btn')
+		if (!$btn.length) return
+
+		const btn_text = this.get_button_text(frm, item)
+		$btn.text(btn_text).attr('title', btn_text)
 	},
 
 	/**
@@ -279,7 +344,16 @@ const CPQTransaction = {
 				5
 			)
 
-			await frm.save()
+			try {
+				await frm.save()
+			} catch (save_error) {
+				frappe.msgprint({
+					title: __('Save Failed'),
+					message: __('Could not save the document. Please fix any errors and try again.'),
+					indicator: 'red',
+				})
+				return
+			}
 
 			// After save, temporary child names are replaced with permanent ones.
 			// Re-fetch the item row by idx to get the correct cdn.
@@ -359,7 +433,18 @@ const CPQTransaction = {
 			}
 		})
 
-		// Add read-only notice for submitted documents
+		// Add template selector and read-only notice for submitted documents
+		if (!is_submitted) {
+			dialog_fields.unshift({
+				fieldtype: 'HTML',
+				fieldname: 'template_section',
+				options: `<div class="cpq-template-section" style="margin-bottom: 15px;">
+					<button class="btn btn-xs btn-default cpq-load-template-btn">${__('Load Template')}</button>
+					<button class="btn btn-xs btn-default cpq-save-template-btn" style="margin-left: 5px;">${__('Save as Template')}</button>
+				</div>`,
+			})
+		}
+
 		if (is_submitted) {
 			dialog_fields.unshift({
 				fieldtype: 'HTML',
@@ -402,6 +487,103 @@ const CPQTransaction = {
 		}
 
 		dialog.show()
+
+		// Bind template buttons
+		if (!is_submitted) {
+			dialog.$wrapper.find('.cpq-load-template-btn').on('click', () => {
+				this._load_template(dialog, configurator, label_to_value_maps)
+			})
+			dialog.$wrapper.find('.cpq-save-template-btn').on('click', () => {
+				this._save_as_template(dialog, configurator, label_to_value_maps)
+			})
+		}
+	},
+
+	/**
+	 * Load a template into the configuration dialog
+	 */
+	async _load_template(dialog, configurator, label_to_value_maps) {
+		const templates = await frappe.call({
+			method: 'erpnext_cpq.api.configurator.get_templates',
+			args: { configurator_name: configurator },
+		})
+
+		const template_list = templates.message || []
+		if (!template_list.length) {
+			frappe.msgprint(__('No templates found for this configurator.'))
+			return
+		}
+
+		const template_dialog = new frappe.ui.Dialog({
+			title: __('Select Template'),
+			fields: [
+				{
+					fieldtype: 'Select',
+					fieldname: 'template',
+					label: __('Template'),
+					options: template_list.map(t => t.template_name).join('\n'),
+					reqd: 1,
+				},
+			],
+			primary_action_label: __('Load'),
+			primary_action: async values => {
+				const selected = template_list.find(t => t.template_name === values.template)
+				if (selected && selected.selections) {
+					for (const sel of selected.selections) {
+						let value = sel.value
+						// Convert value to label for Select fields
+						if (label_to_value_maps[sel.option_name]) {
+							const map = label_to_value_maps[sel.option_name]
+							for (const [label, val] of Object.entries(map)) {
+								if (val === value) {
+									value = label
+									break
+								}
+							}
+						}
+						await dialog.set_value(sel.option_name, value)
+					}
+					frappe.show_alert({ message: __('Template loaded'), indicator: 'green' })
+				}
+				template_dialog.hide()
+			},
+		})
+		template_dialog.show()
+	},
+
+	/**
+	 * Save current dialog values as a template
+	 */
+	async _save_as_template(dialog, configurator, label_to_value_maps) {
+		const raw_values = dialog.get_values()
+		if (!raw_values) return
+		const values = this.convert_labels_to_values(raw_values, label_to_value_maps)
+
+		const name_dialog = new frappe.ui.Dialog({
+			title: __('Save as Template'),
+			fields: [
+				{
+					fieldtype: 'Data',
+					fieldname: 'template_name',
+					label: __('Template Name'),
+					reqd: 1,
+				},
+			],
+			primary_action_label: __('Save'),
+			primary_action: async name_values => {
+				await frappe.call({
+					method: 'erpnext_cpq.api.configurator.save_as_template',
+					args: {
+						configurator_name: configurator,
+						template_name: name_values.template_name,
+						selections: values,
+					},
+				})
+				frappe.show_alert({ message: __('Template saved'), indicator: 'green' })
+				name_dialog.hide()
+			},
+		})
+		name_dialog.show()
 	},
 
 	/**
@@ -425,6 +607,7 @@ const CPQTransaction = {
 
 		try {
 			let config_name
+			let config_summary = ''
 			let change_diff = null
 
 			if (existing_config) {
@@ -455,7 +638,9 @@ const CPQTransaction = {
 						parent_item_row: cdn,
 					},
 				})
-				config_name = create_response.message
+				const create_result = create_response.message
+				config_name = create_result.name
+				config_summary = create_result.configuration_summary || ''
 			}
 
 			// Evaluate configuration to get pricing
@@ -469,46 +654,36 @@ const CPQTransaction = {
 				},
 			})
 
-			const result_name = eval_response.message
+			const eval_result = eval_response.message
+			const result_name = eval_result.name
+			const result_total = eval_result.total || 0
+			const summary = config_summary || eval_result.configuration_summary || ''
 
-			// Get the result details
-			const result_doc = await frappe.db.get_doc('Configuration Result', result_name)
-			const config_doc = await frappe.db.get_doc('Product Configuration', config_name)
-
-			// Update line item
-			frappe.model.set_value(cdt, cdn, 'product_configuration', config_name)
-			frappe.model.set_value(cdt, cdn, 'configuration_result', result_name)
-			frappe.model.set_value(cdt, cdn, 'rate', result_doc.total || 0)
+			// Update line item - await each set_value for correct ordering
+			await frappe.model.set_value(cdt, cdn, 'product_configuration', config_name)
+			await frappe.model.set_value(cdt, cdn, 'configuration_result', result_name)
 
 			// Update description with configuration summary
-			// Remove any existing configuration summary first
 			let current_desc = item.description || ''
-			const summary = config_doc.configuration_summary || ''
 			if (summary) {
-				// Remove old configuration block if present
-				// Handle legacy format (with ━ markers)
-				const legacy_marker = '━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
-				const firstMarkerIdx = current_desc.indexOf(legacy_marker)
-				if (firstMarkerIdx !== -1) {
-					const lastMarkerIdx = current_desc.lastIndexOf(legacy_marker)
-					if (lastMarkerIdx > firstMarkerIdx) {
-						current_desc =
-							current_desc.substring(0, firstMarkerIdx) + current_desc.substring(lastMarkerIdx + legacy_marker.length)
-					}
-				}
-
-				// Handle new format: "Configuration:" followed by bullet lines
-				// Use regex to match the entire block
-				current_desc = current_desc.replace(/Configuration:\n(• [^\n]+\n?)*/g, '')
-
-				// Clean up extra newlines
-				current_desc = current_desc.replace(/\n{3,}/g, '\n\n').trim()
-
+				current_desc = this.strip_configuration_block(current_desc)
 				const new_desc = current_desc ? current_desc + '\n\n' + summary : summary
-				frappe.model.set_value(cdt, cdn, 'description', new_desc)
+				await frappe.model.set_value(cdt, cdn, 'description', new_desc)
 			}
 
+			// Set all rate fields to prevent ERPNext async handlers from overwriting
+			const rate = result_total
+			await frappe.model.set_value(cdt, cdn, 'price_list_rate', rate)
+			await frappe.model.set_value(cdt, cdn, 'base_price_list_rate', rate)
+			await frappe.model.set_value(cdt, cdn, 'base_rate', rate)
+			await frappe.model.set_value(cdt, cdn, 'rate', rate)
+
+			frm.dirty()
 			frm.refresh_field('items')
+
+			// Update button text to reflect new state
+			const updated_item = frappe.get_doc(cdt, cdn)
+			this.update_configure_button_text(frm, updated_item)
 
 			frappe.show_alert(
 				{
@@ -519,6 +694,9 @@ const CPQTransaction = {
 			)
 
 			dialog.hide()
+
+			// Auto-save to persist configuration immediately
+			await frm.save()
 		} catch (error) {
 			frappe.msgprint({
 				title: __('Configuration Error'),
@@ -526,6 +704,41 @@ const CPQTransaction = {
 				indicator: 'red',
 			})
 		}
+	},
+
+	/**
+	 * Strip configuration summary block from a description string.
+	 * Handles plain text, HTML-encoded content, and varying line endings.
+	 * @param {string} desc - The current description
+	 * @returns {string} Description with configuration block removed
+	 */
+	strip_configuration_block(desc) {
+		if (!desc) return ''
+
+		// Handle legacy format (with ━ markers)
+		const legacy_marker = '━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+		const firstMarkerIdx = desc.indexOf(legacy_marker)
+		if (firstMarkerIdx !== -1) {
+			const lastMarkerIdx = desc.lastIndexOf(legacy_marker)
+			if (lastMarkerIdx > firstMarkerIdx) {
+				desc = desc.substring(0, firstMarkerIdx) + desc.substring(lastMarkerIdx + legacy_marker.length)
+			}
+		}
+
+		// Handle new format: "Configuration:" followed by bullet lines
+		// Support \n, \r\n, and <br> / <br/> / <br /> as line breaks
+		// Also handle HTML-encoded bullets (&#8226; or &bull;)
+		desc = desc.replace(
+			/Configuration:\s*(?:(?:<br\s*\/?>|\r?\n)\s*(?:•|&#8226;|&bull;)\s*[^\n<]+)*/gi,
+			''
+		)
+
+		// Clean up extra whitespace and line breaks
+		desc = desc.replace(/(<br\s*\/?>){3,}/gi, '<br><br>')
+		desc = desc.replace(/(\r?\n){3,}/g, '\n\n')
+		desc = desc.trim()
+
+		return desc
 	},
 
 	/**
@@ -553,12 +766,25 @@ const CPQTransaction = {
 	 * @param {Object} item - Item row
 	 * @param {Array} diff - Array of change objects
 	 */
+	/**
+	 * Escape HTML special characters to prevent XSS
+	 * @param {string} str - String to escape
+	 * @returns {string} Escaped string
+	 */
+	escape_html(str) {
+		if (!str) return ''
+		const div = document.createElement('div')
+		div.appendChild(document.createTextNode(str))
+		return div.innerHTML
+	},
+
 	async post_change_comment(frm, item, diff) {
 		if (!diff || diff.length === 0) return
 
-		const changes = diff.map(d => `<li><strong>${d.option}</strong>: ${d.from} → ${d.to}</li>`).join('')
+		const esc = v => this.escape_html(String(v ?? ''))
+		const changes = diff.map(d => `<li><strong>${esc(d.option)}</strong>: ${esc(d.from)} → ${esc(d.to)}</li>`).join('')
 
-		const comment = `<p>Configuration updated for <strong>${item.item_code}</strong> (Row ${item.idx}):</p><ul>${changes}</ul>`
+		const comment = `<p>Configuration updated for <strong>${esc(item.item_code)}</strong> (Row ${item.idx}):</p><ul>${changes}</ul>`
 
 		await frappe.call({
 			method: 'frappe.desk.form.utils.add_comment',
@@ -572,6 +798,135 @@ const CPQTransaction = {
 
 		// Refresh comments
 		frm.timeline.refresh()
+	},
+
+	/**
+	 * Clear the configuration cache entry for a specific item code
+	 * @param {string} item_code - The item code to clear
+	 */
+	clear_cache_for_item(item_code) {
+		if (item_code && this._configurable_cache.hasOwnProperty(item_code)) {
+			delete this._configurable_cache[item_code]
+		}
+	},
+
+	/**
+	 * Show breakdown dialog for a configured item
+	 * @param {Object} frm - Frappe form object
+	 * @param {string} cdt - Child DocType
+	 * @param {string} cdn - Child DocType name
+	 */
+	async show_breakdown_dialog(frm, cdt, cdn) {
+		const item = frappe.get_doc(cdt, cdn)
+		if (!item.configuration_result) {
+			frappe.msgprint(__('No configuration result found for this item.'))
+			return
+		}
+
+		const response = await frappe.call({
+			method: 'erpnext_cpq.api.breakdown.get_configuration_breakdown',
+			args: { configuration_result_name: item.configuration_result },
+		})
+
+		const data = response.message
+		if (!data || !data.items || !data.items.length) {
+			frappe.msgprint(__('No component items found.'))
+			return
+		}
+
+		// Build table HTML
+		let table_html = `
+			<table class="table table-bordered table-condensed" style="margin-bottom: 10px;">
+				<thead>
+					<tr>
+						<th>${__('Item')}</th>
+						<th>${__('Item Name')}</th>
+						<th class="text-right">${__('Qty')}</th>
+						<th>${__('UOM')}</th>
+						<th class="text-right">${__('Rate')}</th>
+						<th class="text-right">${__('Amount')}</th>
+					</tr>
+				</thead>
+				<tbody>`
+
+		const esc = v => this.escape_html(String(v ?? ''))
+		const fmt = (val, currency) => format_currency(val, currency)
+
+		for (const comp of data.items) {
+			table_html += `
+				<tr>
+					<td>${esc(comp.item_code)}</td>
+					<td>${esc(comp.item_name)}</td>
+					<td class="text-right">${comp.qty}</td>
+					<td>${esc(comp.uom)}</td>
+					<td class="text-right">${fmt(comp.rate, data.currency)}</td>
+					<td class="text-right">${fmt(comp.amount, data.currency)}</td>
+				</tr>`
+		}
+
+		table_html += `
+				</tbody>
+				<tfoot>
+					<tr>
+						<td colspan="5" class="text-right"><strong>${__('Total')}</strong></td>
+						<td class="text-right"><strong>${fmt(data.total, data.currency)}</strong></td>
+					</tr>
+				</tfoot>
+			</table>`
+
+		if (data.configuration_summary) {
+			table_html += `<div class="text-muted" style="white-space: pre-line;">${esc(data.configuration_summary)}</div>`
+		}
+
+		const dialog = new frappe.ui.Dialog({
+			title: __('Configuration Breakdown - {0} (Row {1})', [item.item_code, item.idx]),
+			size: 'large',
+			fields: [
+				{
+					fieldtype: 'HTML',
+					fieldname: 'breakdown_html',
+					options: table_html,
+				},
+			],
+			primary_action_label: __('Close'),
+			primary_action: () => dialog.hide(),
+		})
+		dialog.show()
+	},
+
+	/**
+	 * Add visual indicators to configured item rows
+	 * @param {Object} frm - Frappe form object
+	 */
+	add_row_indicators(frm) {
+		const $grid = frm.fields_dict.items?.grid?.wrapper
+		if (!$grid) return
+
+		for (const item of frm.doc.items || []) {
+			if (!item.item_code) continue
+
+			const is_configurable = this._configurable_cache[item.item_code]
+			if (!is_configurable) continue
+
+			const $row = $grid.find(`.grid-row[data-idx="${item.idx}"]`)
+			if (!$row.length) continue
+
+			// Remove existing indicators
+			$row.find('.cpq-indicator').remove()
+
+			const has_config = !!item.product_configuration
+			const color = has_config ? 'var(--green-600, green)' : 'var(--orange-500, orange)'
+			const tooltip = has_config ? __('Configured') : __('Needs configuration')
+
+			const $indicator = $(
+				`<span class="cpq-indicator" style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${color}; margin-right: 4px; vertical-align: middle;" title="${tooltip}"></span>`
+			)
+
+			const $cell = $row.find('[data-fieldname="item_code"] .static-area')
+			if ($cell.length && !$cell.find('.cpq-indicator').length) {
+				$cell.prepend($indicator)
+			}
+		}
 	},
 }
 
@@ -591,13 +946,13 @@ function setup_cpq_handlers(doctype, item_doctype) {
 			CPQTransaction.init(frm)
 		},
 		onload(frm) {
-			// Cleanup observer when navigating away
-			$(window).on('beforeunload.cpq', () => {
-				if (CPQTransaction._observer) {
-					CPQTransaction._observer.disconnect()
-					CPQTransaction._observer = null
-				}
+			// Cleanup observer when navigating away (SPA navigation)
+			$(window).off('beforeunload.cpq').on('beforeunload.cpq', () => {
+				CPQTransaction.cleanup()
 			})
+		},
+		on_hide(frm) {
+			CPQTransaction.cleanup()
 		},
 	})
 
@@ -605,6 +960,12 @@ function setup_cpq_handlers(doctype, item_doctype) {
 	frappe.ui.form.on(item_doctype, {
 		item_code(frm, cdt, cdn) {
 			CPQTransaction.on_item_code_change(frm, cdt, cdn)
+		},
+		before_items_remove(frm, cdt, cdn) {
+			const item = frappe.get_doc(cdt, cdn)
+			if (item?.item_code) {
+				CPQTransaction.clear_cache_for_item(item.item_code)
+			}
 		},
 	})
 }
@@ -621,3 +982,6 @@ setup_cpq_handlers('Sales Order', 'Sales Order Item')
 
 // Sales Invoice
 setup_cpq_handlers('Sales Invoice', 'Sales Invoice Item')
+
+// Delivery Note
+setup_cpq_handlers('Delivery Note', 'Delivery Note Item')
