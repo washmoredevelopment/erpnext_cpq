@@ -13,11 +13,6 @@ class ConfiguratorOption(Document):
 	if TYPE_CHECKING:
 		from frappe.types import DF
 
-		from erpnext_cpq.erpnext_cpq.doctype.option_choice.option_choice import (
-			OptionChoice,
-		)
-
-		choices: DF.Table[OptionChoice]
 		default_value: DF.Data | None
 		depends_on: DF.Data | None
 		depends_on_value: DF.Data | None

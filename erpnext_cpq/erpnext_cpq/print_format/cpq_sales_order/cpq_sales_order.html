@@ -1,0 +1,55 @@
+{%- from "erpnext_cpq/print_format/cpq_macros.html" import render_items_table -%}
+
+<div class="page-break">
+	<div id="header-html" class="hidden-pdf">
+		<div class="letter-head text-center">
+			<div class="letter-head-header">{{ doc.company }}</div>
+		</div>
+	</div>
+
+	<h2 class="text-center">{{ _("Sales Order") }}</h2>
+
+	<div class="row section-break">
+		<div class="col-xs-6 column-break">
+			<div><strong>{{ _("Customer") }}:</strong> {{ doc.customer_name or doc.customer or "" }}</div>
+			{% if doc.customer_address %}
+			<div>{{ frappe.get_doc("Address", doc.customer_address).get_display() if doc.customer_address else "" }}</div>
+			{% endif %}
+		</div>
+		<div class="col-xs-6 column-break text-right">
+			<div><strong>{{ _("Sales Order") }}:</strong> {{ doc.name }}</div>
+			<div><strong>{{ _("Date") }}:</strong> {{ frappe.format(doc.transaction_date, {"fieldtype": "Date"}) }}</div>
+			{% if doc.delivery_date %}
+			<div><strong>{{ _("Delivery Date") }}:</strong> {{ frappe.format(doc.delivery_date, {"fieldtype": "Date"}) }}</div>
+			{% endif %}
+			{% if doc.po_no %}
+			<div><strong>{{ _("PO No") }}:</strong> {{ doc.po_no }}</div>
+			{% endif %}
+		</div>
+	</div>
+
+	{{ render_items_table(doc) }}
+
+	<div class="row section-break" style="margin-top: 20px;">
+		<div class="col-xs-6"></div>
+		<div class="col-xs-6">
+			<table class="table table-condensed no-border">
+				<tr>
+					<td class="text-right" style="width: 70%;"><strong>{{ _("Total") }}</strong></td>
+					<td class="text-right">{{ frappe.format(doc.grand_total, {"fieldtype": "Currency", "options": doc.currency}) }}</td>
+				</tr>
+				<tr>
+					<td class="text-right"><strong>{{ _("Grand Total") }}</strong></td>
+					<td class="text-right"><strong>{{ frappe.format(doc.rounded_total or doc.grand_total, {"fieldtype": "Currency", "options": doc.currency}) }}</strong></td>
+				</tr>
+			</table>
+		</div>
+	</div>
+
+	{% if doc.terms %}
+	<div class="section-break" style="margin-top: 20px;">
+		<strong>{{ _("Terms and Conditions") }}</strong>
+		<div>{{ doc.terms }}</div>
+	</div>
+	{% endif %}
+</div>

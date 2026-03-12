@@ -29,6 +29,7 @@ repos:
     rev: 951ccf4d5bb0d692b457a5ebc4215d755618eb68
     hooks:
       - id: black
+        exclude: 'hooks\.py$'
 
   - repo: https://github.com/PyCQA/autoflake
     rev: v2.3.1
@@ -56,6 +57,7 @@ repos:
       - id: update_pre_commit_config
       - id: validate_copyright
         files: '\.(js|ts|py|md)$'
+        exclude: 'hooks\.py$'
         args: ['--app', 'erpnext_cpq']
       - id: clean_customized_doctypes
         args: ['--app', 'erpnext_cpq']

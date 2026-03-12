@@ -1,0 +1,18 @@
+{
+	"align_labels_right": 0,
+	"creation": "2024-12-29 00:00:00.000000",
+	"custom_format": 1,
+	"doc_type": "Delivery Note",
+	"doctype": "Print Format",
+	"font_size": 0,
+	"html": "",
+	"modified": "2024-12-29 00:00:00.000000",
+	"modified_by": "Administrator",
+	"module": "ERPNext CPQ",
+	"name": "CPQ Delivery Note",
+	"owner": "Administrator",
+	"print_format_type": "Jinja",
+	"raw_printing": 0,
+	"show_section_headings": 0,
+	"standard": "Yes"
+}
