@@ -122,18 +122,27 @@ function update_option_choices_select(frm) {
 
 function update_option_choices_section_description(frm, select_options) {
 	// Update the Option Choices section to indicate which options need choices defined
+	// Section Break controls don't have set_description(), so update the DOM directly
 	const section_field = frm.fields_dict.section_break_choices
 	if (!section_field) return
 
+	let desc_html
 	if (select_options.length === 0) {
-		section_field.set_description(
+		desc_html =
 			'<span class="text-muted">No Select-type options defined. ' +
-				'Option Choices are only used for <b>Select</b> field types.</span>'
-		)
+			'Option Choices are only used for <b>Select</b> field types.</span>'
 	} else {
-		section_field.set_description(
+		desc_html =
 			'Define dropdown choices for Select-type options: <b>' + select_options.join('</b>, <b>') + '</b>'
-		)
+	}
+
+	// Section renders description in .form-section-description; create it if missing
+	const $wrapper = $(section_field.wrapper || section_field.$wrapper)
+	let $desc = $wrapper.find('.form-section-description')
+	if ($desc.length) {
+		$desc.html(desc_html)
+	} else {
+		$wrapper.append(`<div class="col-sm-12 form-section-description">${desc_html}</div>`)
 	}
 }
 
