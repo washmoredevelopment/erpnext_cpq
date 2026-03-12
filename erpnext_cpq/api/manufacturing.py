@@ -99,6 +99,11 @@ def link_bom_to_transaction_item(doctype, docname, item_row_name, bom_name):
 	if not frappe.db.exists("BOM", bom_name):
 		frappe.throw(_("BOM {0} does not exist.").format(bom_name))
 
+	# Verify item row belongs to this document
+	row_parent = frappe.db.get_value(f"{doctype} Item", item_row_name, "parent")
+	if row_parent != docname:
+		frappe.throw(_("Item row {0} does not belong to {1}.").format(item_row_name, docname))
+
 	# Set bom_no on the item row
 	frappe.db.set_value(
 		f"{doctype} Item",

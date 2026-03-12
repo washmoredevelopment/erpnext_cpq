@@ -104,7 +104,7 @@ def get_data(filters):
 			AND soi.configuration_result IS NOT NULL
 			AND soi.configuration_result != ''
 			AND {where_clause}
-		GROUP BY soi.item_code, cr.configurator, so.customer
+		GROUP BY soi.item_code, soi.item_name, cr.configurator, so.customer
 		ORDER BY total_revenue DESC
 		""",
 		values,
