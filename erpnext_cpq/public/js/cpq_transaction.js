@@ -600,6 +600,8 @@ const CPQTransaction = {
 		const item = frappe.get_doc(cdt, cdn)
 		const configurator = item._product_configurator
 
+		dialog.disable_primary_action()
+
 		frappe.show_alert({
 			message: __('Applying configuration...'),
 			indicator: 'blue',
@@ -667,7 +669,8 @@ const CPQTransaction = {
 			let current_desc = item.description || ''
 			if (summary) {
 				current_desc = this.strip_configuration_block(current_desc)
-				const new_desc = current_desc ? current_desc + '\n\n' + summary : summary
+				const wrapped_summary = `<!-- CPQ_CONFIG_START -->${summary}<!-- CPQ_CONFIG_END -->`
+				const new_desc = current_desc ? current_desc + '\n\n' + wrapped_summary : wrapped_summary
 				await frappe.model.set_value(cdt, cdn, 'description', new_desc)
 			}
 
@@ -703,6 +706,8 @@ const CPQTransaction = {
 				message: error.message || __('Failed to apply configuration'),
 				indicator: 'red',
 			})
+		} finally {
+			dialog.enable_primary_action()
 		}
 	},
 
@@ -715,7 +720,11 @@ const CPQTransaction = {
 	strip_configuration_block(desc) {
 		if (!desc) return ''
 
-		// Handle legacy format (with ━ markers)
+		// Primary: use HTML comment markers
+		const markerRegex = /<!-- CPQ_CONFIG_START -->[\s\S]*?<!-- CPQ_CONFIG_END -->/g
+		desc = desc.replace(markerRegex, '')
+
+		// Legacy fallback: handle old format (with ━ markers)
 		const legacy_marker = '━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 		const firstMarkerIdx = desc.indexOf(legacy_marker)
 		if (firstMarkerIdx !== -1) {
@@ -725,9 +734,7 @@ const CPQTransaction = {
 			}
 		}
 
-		// Handle new format: "Configuration:" followed by bullet lines
-		// Support \n, \r\n, and <br> / <br/> / <br /> as line breaks
-		// Also handle HTML-encoded bullets (&#8226; or &bull;)
+		// Legacy fallback: "Configuration:" followed by bullet lines
 		desc = desc.replace(
 			/Configuration:\s*(?:(?:<br\s*\/?>|\r?\n)\s*(?:•|&#8226;|&bull;)\s*[^\n<]+)*/gi,
 			''

@@ -96,7 +96,8 @@ jinja = {
 # ------------
 
 # before_install = "erpnext_cpq.install.before_install"
-# after_install = "erpnext_cpq.install.after_install"
+after_install = "erpnext_cpq.setup.install.after_install"
+after_migrate = "erpnext_cpq.setup.install.after_migrate"
 
 # Uninstallation
 # ------------
