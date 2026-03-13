@@ -679,15 +679,6 @@ def evaluate_configuration(
 		max_discount = frappe.db.get_value("Item", item_code, "max_discount") or 0
 		item_data["max_discount"] = max_discount
 
-	# Delete any existing Configuration Result for this configuration
-	existing_results = frappe.get_all(
-		"Configuration Result",
-		filters={"configuration": configuration_name},
-		pluck="name",
-	)
-	for old_result in existing_results:
-		frappe.delete_doc("Configuration Result", old_result, force=True)
-
 	# Create Configuration Result
 	result = frappe.new_doc("Configuration Result")
 	result.configuration = configuration_name
@@ -730,6 +721,15 @@ def evaluate_configuration(
 		result.max_discount = 0
 
 	result.insert()
+
+	# Delete old Configuration Results now that the new one is safely created
+	existing_results = frappe.get_all(
+		"Configuration Result",
+		filters={"configuration": configuration_name, "name": ["!=", result.name]},
+		pluck="name",
+	)
+	for old_result in existing_results:
+		frappe.delete_doc("Configuration Result", old_result, force=True)
 
 	return {
 		"name": result.name,

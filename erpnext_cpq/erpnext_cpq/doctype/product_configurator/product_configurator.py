@@ -38,9 +38,22 @@ class ProductConfigurator(Document):
 	# end: auto-generated types
 
 	def validate(self):
+		self.validate_unique_option_names()
 		self.validate_option_choices()
 		self.validate_select_options_have_choices()
 		self.validate_duplicate_choice_labels()
+
+	def validate_unique_option_names(self):
+		seen = set()
+		for opt in self.options:
+			if opt.option_name:
+				if opt.option_name in seen:
+					frappe.throw(
+						_("Duplicate option name '{0}'. Each option must have a unique name.").format(
+							opt.option_name
+						)
+					)
+				seen.add(opt.option_name)
 
 	def validate_option_choices(self):
 		"""
